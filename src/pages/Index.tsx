@@ -28,22 +28,17 @@ const Index = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [activeTab, setActiveTab] = useState('fridge');
   const [todayBasket, setTodayBasket] = useState<FoodItem[]>([]);
-  const [apiKey, setApiKey] = useState('');
 
   // Load data from localStorage
   useEffect(() => {
     const savedItems = localStorage.getItem('fridgeItems');
     const savedBasket = localStorage.getItem('todayBasket');
-    const savedApiKey = localStorage.getItem('geminiApiKey');
     
     if (savedItems) {
       setFoodItems(JSON.parse(savedItems));
     }
     if (savedBasket) {
       setTodayBasket(JSON.parse(savedBasket));
-    }
-    if (savedApiKey) {
-      setApiKey(savedApiKey);
     }
   }, []);
 
@@ -107,6 +102,11 @@ const Index = () => {
     toast.success('食材を削除しました');
   };
 
+  const updateFridgeItem = (updatedItem: FoodItem) => {
+    setFoodItems(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+    toast.success('食材を更新しました');
+  };
+
   const getExpiringCount = () => {
     const today = new Date();
     const threeDaysLater = new Date(today);
@@ -116,12 +116,6 @@ const Index = () => {
       const expiryDate = new Date(item.expiryDate);
       return expiryDate <= threeDaysLater;
     }).length;
-  };
-
-  const handleApiKeySubmit = (key: string) => {
-    setApiKey(key);
-    localStorage.setItem('geminiApiKey', key);
-    toast.success('Gemini APIキーを保存しました');
   };
 
   return (
@@ -192,6 +186,7 @@ const Index = () => {
             foodItems={foodItems} 
             onMoveToBasket={moveToBasket}
             onRemoveItem={removeFromFridge}
+            onUpdateItem={updateFridgeItem}
           />
         )}
         
@@ -204,11 +199,7 @@ const Index = () => {
         )}
         
         {activeTab === 'recipes' && (
-          <RecipesSuggestion 
-            foodItems={foodItems}
-            apiKey={apiKey}
-            onApiKeySubmit={handleApiKeySubmit}
-          />
+          <RecipesSuggestion foodItems={foodItems} />
         )}
         
         {activeTab === 'budget' && (
@@ -219,8 +210,6 @@ const Index = () => {
       {/* Receipt Scanner Modal */}
       {showScanner && (
         <ReceiptScanner
-          apiKey={apiKey}
-          onApiKeySubmit={handleApiKeySubmit}
           onItemsScanned={handleReceiptScanned}
           onClose={() => setShowScanner(false)}
         />

@@ -3,8 +3,6 @@ import React, { useState } from 'react';
 import { ChefHat, Loader2, Clock, Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
@@ -31,25 +29,16 @@ interface Recipe {
 
 interface RecipesSuggestionProps {
   foodItems: FoodItem[];
-  apiKey: string;
-  onApiKeySubmit: (key: string) => void;
 }
 
-const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ 
-  foodItems, 
-  apiKey, 
-  onApiKeySubmit 
-}) => {
+// 内部でAPIキーを管理
+const GEMINI_API_KEY = 'AIzaSyDxKvQOuGk4tJFGvQzQzQwQzQzQzQzQzQz'; // 実際のAPIキーに置き換えてください
+
+const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems }) => {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [tempApiKey, setTempApiKey] = useState(apiKey);
 
   const generateRecipes = async () => {
-    if (!tempApiKey.trim()) {
-      toast.error('Gemini APIキーを入力してください');
-      return;
-    }
-
     if (foodItems.length === 0) {
       toast.error('冷蔵庫に食材を追加してください');
       return;
@@ -60,7 +49,7 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({
     try {
       const availableIngredients = foodItems.map(item => `${item.name}（${item.quantity}）`).join(', ');
       
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${tempApiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -113,11 +102,6 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({
       const parsedData = JSON.parse(jsonMatch[0]);
       setRecipes(parsedData.recipes || []);
 
-      // Save API key if it worked
-      if (tempApiKey !== apiKey) {
-        onApiKeySubmit(tempApiKey);
-      }
-
       toast.success('レシピを生成しました！');
       
     } catch (error) {
@@ -154,30 +138,6 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({
         </div>
       </Card>
 
-      {/* API Key Input */}
-      {!apiKey && (
-        <Card className="p-4 bg-yellow-50 border border-yellow-200">
-          <Label htmlFor="recipeApiKey" className="text-sm font-medium text-yellow-800">
-            Gemini APIキーを入力してください
-          </Label>
-          <div className="flex space-x-2 mt-2">
-            <Input
-              id="recipeApiKey"
-              type="password"
-              placeholder="Gemini APIキーを入力"
-              value={tempApiKey}
-              onChange={(e) => setTempApiKey(e.target.value)}
-            />
-            <Button 
-              onClick={() => onApiKeySubmit(tempApiKey)}
-              disabled={!tempApiKey.trim()}
-            >
-              保存
-            </Button>
-          </div>
-        </Card>
-      )}
-
       {/* Generate Recipes Button */}
       <Card className="p-6">
         <div className="flex items-center justify-between">
@@ -201,7 +161,7 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({
           
           <Button
             onClick={generateRecipes}
-            disabled={isLoading || !tempApiKey.trim() || foodItems.length === 0}
+            disabled={isLoading || foodItems.length === 0}
             className="bg-purple-600 hover:bg-purple-700"
           >
             {isLoading ? (

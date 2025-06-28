@@ -3,8 +3,6 @@ import React, { useState, useRef } from 'react';
 import { Camera, Upload, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
 interface FoodItem {
@@ -20,30 +18,23 @@ interface FoodItem {
 }
 
 interface ReceiptScannerProps {
-  apiKey: string;
-  onApiKeySubmit: (key: string) => void;
   onItemsScanned: (items: FoodItem[]) => void;
   onClose: () => void;
 }
 
+// 内部でAPIキーを管理
+const GEMINI_API_KEY = 'AIzaSyDxKvQOuGk4tJFGvQzQzQwQzQzQzQzQzQz'; // 実際のAPIキーに置き換えてください
+
 const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
-  apiKey,
-  onApiKeySubmit,
   onItemsScanned,
   onClose
 }) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [tempApiKey, setTempApiKey] = useState(apiKey);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
-    if (!tempApiKey.trim()) {
-      toast.error('Gemini APIキーを入力してください');
-      return;
-    }
 
     await processReceiptImage(file);
   };
@@ -56,7 +47,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
       const base64 = await fileToBase64(file);
       
       // Call Gemini API to analyze receipt
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${tempApiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -65,21 +56,28 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
           contents: [{
             parts: [
               {
-                text: `このレシートの画像を分析して、食品アイテムを特定してください。各アイテムについて以下の情報をJSONフォーマットで返してください：
-                
-                {
-                  "items": [
-                    {
-                      "name": "商品名（日本語）",
-                      "category": "カテゴリ（野菜、肉類、魚類、乳製品、調味料、パン・米類、冷凍食品、その他）",
-                      "quantity": 数量,
-                      "price": 価格,
-                      "estimatedExpiryDays": 推定賞味期限日数
-                    }
-                  ]
-                }
-                
-                食品以外のアイテムは除外してください。価格が不明な場合は0を設定してください。`
+                text: `このレシートの画像を詳細に分析して、食品・食材のみを特定してください。非食品（洗剤、ティッシュ、薬品など）は完全に除外してください。
+
+各食品アイテムについて以下の情報をJSONフォーマットで返してください：
+
+{
+  "items": [
+    {
+      "name": "具体的な商品名（日本語、略語ではなく正式な食材名）",
+      "category": "適切なカテゴリ（野菜、肉類、魚類、乳製品、調味料、パン・米類、冷凍食品、その他）",
+      "quantity": 数量または1,
+      "price": 正確な価格,
+      "estimatedExpiryDays": 食材の種類に基づく推定賞味期限日数
+    }
+  ]
+}
+
+重要な指示：
+- 食品・食材のみを抽出し、非食品は完全に無視する
+- 商品名は具体的に（例：「キャベツ」「豚バラ肉」「牛乳」）
+- 賞味期限は食材の特性を考慮して設定（野菜：3-7日、肉類：2-3日、乳製品：5-10日、冷凍食品：30-90日、調味料：180-365日など）
+- 価格は必ず正確に読み取る
+- 不明な場合は合理的な推定値を使用`
               },
               {
                 inline_data: {
@@ -102,6 +100,8 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
       if (!content) {
         throw new Error('APIからの応答が不正です');
       }
+
+      console.log('Gemini response:', content);
 
       // Extract JSON from response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -132,11 +132,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
         return;
       }
 
-      // Save API key if it worked
-      if (tempApiKey !== apiKey) {
-        onApiKeySubmit(tempApiKey);
-      }
-
+      console.log('Processed items:', items);
       onItemsScanned(items);
       
     } catch (error) {
@@ -166,29 +162,10 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
           </Button>
         </div>
 
-        {!apiKey && (
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <Label htmlFor="apiKey" className="text-sm font-medium text-yellow-800">
-              Gemini APIキーが必要です
-            </Label>
-            <Input
-              id="apiKey"
-              type="password"
-              placeholder="Gemini APIキーを入力"
-              value={tempApiKey}
-              onChange={(e) => setTempApiKey(e.target.value)}
-              className="mt-2"
-            />
-            <p className="text-xs text-yellow-700 mt-1">
-              Google AI Studioでキーを取得してください
-            </p>
-          </div>
-        )}
-
         <div className="space-y-4">
           <Button
             onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading || !tempApiKey.trim()}
+            disabled={isLoading}
             className="w-full h-24 border-2 border-dashed border-gray-300 hover:border-green-400 bg-gray-50 hover:bg-green-50 transition-colors"
             variant="outline"
           >
@@ -220,6 +197,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
               <li>• レシート全体が映るように撮影</li>
               <li>• 文字がはっきり見えるように</li>
               <li>• 影や反射を避ける</li>
+              <li>• 食品のみが自動認識されます</li>
             </ul>
           </div>
         </div>

@@ -1,9 +1,10 @@
 
-import React from 'react';
-import { Calendar, AlertTriangle, ShoppingBasket, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Calendar, AlertTriangle, ShoppingBasket, Trash2, Edit } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import FridgeItemEditor from '@/components/FridgeItemEditor';
 
 interface FoodItem {
   id: string;
@@ -21,6 +22,7 @@ interface FridgeViewProps {
   foodItems: FoodItem[];
   onMoveToBasket: (item: FoodItem) => void;
   onRemoveItem: (itemId: string) => void;
+  onUpdateItem: (updatedItem: FoodItem) => void;
 }
 
 const categoryColors = {
@@ -45,7 +47,9 @@ const categoryEmojis = {
   'その他': '📦'
 };
 
-const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRemoveItem }) => {
+const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRemoveItem, onUpdateItem }) => {
+  const [editingItem, setEditingItem] = useState<FoodItem | null>(null);
+
   const getDaysUntilExpiry = (expiryDate: string) => {
     const today = new Date();
     const expiry = new Date(expiryDate);
@@ -70,6 +74,11 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
     acc[item.category].push(item);
     return acc;
   }, {} as Record<string, FoodItem[]>);
+
+  const handleEditSave = (updatedItem: FoodItem) => {
+    onUpdateItem(updatedItem);
+    setEditingItem(null);
+  };
 
   if (foodItems.length === 0) {
     return (
@@ -131,6 +140,14 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
                         <Button
                           size="sm"
                           variant="outline"
+                          onClick={() => setEditingItem(item)}
+                          className="h-7 px-2 text-xs hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => onMoveToBasket(item)}
                           className="h-7 px-2 text-xs hover:bg-green-50 hover:text-green-700 hover:border-green-300"
                         >
@@ -154,6 +171,14 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
           </Card>
         ))}
       </div>
+
+      {editingItem && (
+        <FridgeItemEditor
+          item={editingItem}
+          onSave={handleEditSave}
+          onCancel={() => setEditingItem(null)}
+        />
+      )}
     </div>
   );
 };
