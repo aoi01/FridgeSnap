@@ -118,12 +118,58 @@ const FridgeItemEditor: React.FC<FridgeItemEditorProps> = ({ item, onSave, onCan
             </div>
             <div>
               <Label htmlFor="expiryDate">賞味期限</Label>
-              <Input
-                id="expiryDate"
-                type="date"
-                value={editedItem.expiryDate}
-                onChange={(e) => setEditedItem(prev => ({ ...prev, expiryDate: e.target.value }))}
-              />
+              <div className="flex items-center space-x-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (editedItem.expiryDate) {
+                      const currentDate = new Date(editedItem.expiryDate);
+                      const minDate = new Date(); // 最低今日まで
+                      
+                      const newDate = new Date(currentDate);
+                      newDate.setDate(newDate.getDate() - 1);
+                      
+                      // 最低今日までの制限をチェック
+                      if (newDate >= minDate) {
+                        setEditedItem(prev => ({ ...prev, expiryDate: newDate.toISOString().split('T')[0] }));
+                      }
+                    }
+                  }}
+                  className="px-2 py-1 text-xs border-neutral-300 text-neutral-600 hover:bg-neutral-50"
+                >
+                  -1
+                </Button>
+                <Input
+                  id="expiryDate"
+                  type="date"
+                  value={editedItem.expiryDate}
+                  onChange={(e) => setEditedItem(prev => ({ ...prev, expiryDate: e.target.value }))}
+                  className="flex-1"
+                  min={new Date().toISOString().split('T')[0]} // 最低今日まで
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (editedItem.expiryDate) {
+                      const currentDate = new Date(editedItem.expiryDate);
+                      const newDate = new Date(currentDate);
+                      newDate.setDate(newDate.getDate() + 1);
+                      setEditedItem(prev => ({ ...prev, expiryDate: newDate.toISOString().split('T')[0] }));
+                    } else {
+                      // 初期値として今日の日付を設定
+                      const today = new Date();
+                      setEditedItem(prev => ({ ...prev, expiryDate: today.toISOString().split('T')[0] }));
+                    }
+                  }}
+                  className="px-2 py-1 text-xs border-neutral-300 text-neutral-600 hover:bg-neutral-50"
+                >
+                  +1
+                </Button>
+              </div>
             </div>
           </div>
 

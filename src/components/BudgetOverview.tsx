@@ -1,8 +1,28 @@
-
-import React, { useMemo } from 'react';
-import { TrendingUp, TrendingDown, Calendar, PieChart } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  ReferenceLine,
+  Legend
+} from 'recharts';
+import { 
+  IoWalletOutline,
+  IoTrendingUpOutline,
+  IoReceiptOutline,
+  IoCalculatorOutline,
+  IoCalendarOutline,
+  IoSaveOutline
+} from 'react-icons/io5';
 
 interface FoodItem {
   id: string;
@@ -20,229 +40,370 @@ interface BudgetOverviewProps {
   foodItems: FoodItem[];
 }
 
+interface MonthlyData {
+  month: string;
+  year: number;
+  monthNumber: number;
+  foodExpense: number;
+  livingExpense: number;
+  engelCoefficient: number;
+}
+
 const BudgetOverview: React.FC<BudgetOverviewProps> = ({ foodItems }) => {
+  const [monthlyLivingExpenses, setMonthlyLivingExpenses] = useState<Record<string, number>>({});
+  const [currentMonthInput, setCurrentMonthInput] = useState('');
+
+  // LocalStorageから生活費データを読み込み
+  useEffect(() => {
+    const saved = localStorage.getItem('monthlyLivingExpenses');
+    if (saved) {
+      setMonthlyLivingExpenses(JSON.parse(saved));
+    }
+  }, []);
+
+  // 生活費データを保存
+  useEffect(() => {
+    localStorage.setItem('monthlyLivingExpenses', JSON.stringify(monthlyLivingExpenses));
+  }, [monthlyLivingExpenses]);
+
   const budgetData = useMemo(() => {
     const now = new Date();
-    const thisWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const lastWeek = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    
+    // 今月の食費を計算
     const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    const thisWeekItems = foodItems.filter(item => new Date(item.purchaseDate) >= thisWeek);
-    const lastWeekItems = foodItems.filter(item => {
-      const purchaseDate = new Date(item.purchaseDate);
-      return purchaseDate >= lastWeek && purchaseDate < thisWeek;
-    });
     const thisMonthItems = foodItems.filter(item => new Date(item.purchaseDate) >= thisMonth);
-
-    const thisWeekTotal = thisWeekItems.reduce((sum, item) => sum + item.price, 0);
-    const lastWeekTotal = lastWeekItems.reduce((sum, item) => sum + item.price, 0);
     const thisMonthTotal = thisMonthItems.reduce((sum, item) => sum + item.price, 0);
 
-    // Category breakdown
-    const categoryTotals = foodItems.reduce((acc, item) => {
-      acc[item.category] = (acc[item.category] || 0) + item.price;
-      return acc;
-    }, {} as Record<string, number>);
+    // 月別データを計算（過去6ヶ月）
+    const monthlyData: MonthlyData[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+      
+      const monthKey = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
+      const monthItems = foodItems.filter(item => {
+        const itemDate = new Date(item.purchaseDate);
+        return itemDate >= targetDate && itemDate < nextMonth;
+      });
+      
+      const foodExpense = monthItems.reduce((sum, item) => sum + item.price, 0);
+      const livingExpense = monthlyLivingExpenses[monthKey] || 0;
+      const engelCoefficient = livingExpense > 0 ? (foodExpense / livingExpense) * 100 : 0;
 
-    const categoryData = Object.entries(categoryTotals)
-      .map(([category, total]) => ({ category, total }))
-      .sort((a, b) => b.total - a.total);
+      monthlyData.push({
+        month: targetDate.toLocaleDateString('ja-JP', { year: 'numeric', month: 'short' }),
+        year: targetDate.getFullYear(),
+        monthNumber: targetDate.getMonth() + 1,
+        foodExpense,
+        livingExpense,
+        engelCoefficient: Math.round(engelCoefficient * 10) / 10
+      });
+    }
 
-    // Weekly comparison
-    const weeklyChange = lastWeekTotal > 0 ? ((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100 : 0;
+    // 今月のエンゲル係数
+    const currentLivingExpense = monthlyLivingExpenses[currentMonthKey] || 0;
+    const currentEngelCoefficient = currentLivingExpense > 0 && thisMonthTotal >= 0 
+      ? (thisMonthTotal / currentLivingExpense) * 100 
+      : 0;
+
+    // 購入履歴（今月分）
+    const purchaseHistory = thisMonthItems
+      .sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime())
+      .slice(0, 15);
 
     return {
-      thisWeekTotal,
-      lastWeekTotal,
       thisMonthTotal,
-      weeklyChange,
-      categoryData,
-      thisWeekItems,
-      lastWeekItems
+      currentEngelCoefficient: Math.round(currentEngelCoefficient * 10) / 10,
+      currentLivingExpense,
+      monthlyData,
+      purchaseHistory,
+      currentMonthKey
     };
-  }, [foodItems]);
+  }, [foodItems, monthlyLivingExpenses]);
 
-  const categoryColors = [
-    'bg-red-100 text-red-800',
-    'bg-blue-100 text-blue-800',
-    'bg-green-100 text-green-800',
-    'bg-yellow-100 text-yellow-800',
-    'bg-purple-100 text-purple-800',
-    'bg-pink-100 text-pink-800',
-    'bg-indigo-100 text-indigo-800',
-    'bg-gray-100 text-gray-800'
-  ];
+  const handleSaveLivingExpense = () => {
+    const amount = parseFloat(currentMonthInput);
+    if (isNaN(amount) || amount < 0) {
+      toast.error('正しい金額を入力してください');
+      return;
+    }
 
-  const categoryEmojis = {
-    '野菜': '🥬',
-    '肉類': '🥩',
-    '魚類': '🐟',
-    '乳製品': '🥛',
-    '調味料': '🧂',
-    'パン・米類': '🍞',
-    '冷凍食品': '🧊',
-    'その他': '📦'
+    setMonthlyLivingExpenses(prev => ({
+      ...prev,
+      [budgetData.currentMonthKey]: amount
+    }));
+    
+    toast.success('今月の生活費を保存しました');
+    setCurrentMonthInput('');
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <Card className="p-6 bg-gradient-to-r from-green-500 to-blue-500 text-white">
+      <Card className="p-6 bg-white border border-neutral-200 shadow-sm rounded-xl">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold mb-2">家計簿・支出分析</h2>
-            <p className="opacity-90">食費の管理と分析</p>
+          <div className="flex items-center space-x-4">
+            <div className="bg-discovery-600 p-3 rounded-2xl shadow-md">
+              <IoWalletOutline className="h-8 w-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-neutral-900">家計簿</h1>
+              <p className="text-sm text-neutral-600 font-medium mt-1">食費管理とエンゲル係数分析</p>
+            </div>
           </div>
-          <div className="text-4xl">💰</div>
         </div>
       </Card>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6">
+        {/* 今月の食費 */}
+        <Card className="p-6 bg-white border border-neutral-200 shadow-sm rounded-xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">今週の支出</p>
-              <p className="text-2xl font-bold text-gray-900">
-                ¥{budgetData.thisWeekTotal.toLocaleString()}
-              </p>
-            </div>
-            <div className="bg-blue-100 p-3 rounded-lg">
-              <Calendar className="h-6 w-6 text-blue-600" />
-            </div>
-          </div>
-          
-          <div className="mt-4 flex items-center">
-            {budgetData.weeklyChange > 0 ? (
-              <TrendingUp className="h-4 w-4 text-red-500 mr-1" />
-            ) : (
-              <TrendingDown className="h-4 w-4 text-green-500 mr-1" />
-            )}
-            <span className={`text-sm ${budgetData.weeklyChange > 0 ? 'text-red-600' : 'text-green-600'}`}>
-              前週比 {Math.abs(budgetData.weeklyChange).toFixed(1)}%
-              {budgetData.weeklyChange > 0 ? '増加' : '減少'}
-            </span>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">先週の支出</p>
-              <p className="text-2xl font-bold text-gray-900">
-                ¥{budgetData.lastWeekTotal.toLocaleString()}
-              </p>
-            </div>
-            <div className="bg-gray-100 p-3 rounded-lg">
-              <Calendar className="h-6 w-6 text-gray-600" />
-            </div>
-          </div>
-          <p className="text-sm text-gray-600 mt-4">
-            {budgetData.lastWeekItems.length}つの商品を購入
-          </p>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">今月の合計</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-sm text-neutral-600 mb-2 font-medium">今月の食費</p>
+              <p className="text-3xl font-bold text-neutral-900">
                 ¥{budgetData.thisMonthTotal.toLocaleString()}
               </p>
             </div>
-            <div className="bg-green-100 p-3 rounded-lg">
-              <TrendingUp className="h-6 w-6 text-green-600" />
+            <div className="bg-success-50 p-3 rounded-lg">
+              <IoReceiptOutline className="h-6 w-6 text-success-600" />
             </div>
           </div>
-          <p className="text-sm text-gray-600 mt-4">
-            月平均目標: ¥40,000
-          </p>
+        </Card>
+
+        {/* 今月の生活費 */}
+        <Card className="p-6 bg-white border border-neutral-200 shadow-sm rounded-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-neutral-600 mb-2 font-medium">今月の生活費</p>
+              <p className="text-3xl font-bold text-neutral-900">
+                ¥{budgetData.currentLivingExpense.toLocaleString()}
+              </p>
+            </div>
+            <div className="bg-warning-50 p-3 rounded-lg">
+              <IoCalculatorOutline className="h-6 w-6 text-warning-600" />
+            </div>
+          </div>
+        </Card>
+
+        {/* エンゲル係数 */}
+        <Card className="p-6 bg-white border border-neutral-200 shadow-sm rounded-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-neutral-600 mb-2 font-medium">エンゲル係数</p>
+              <p className="text-3xl font-bold text-neutral-900">
+                {isNaN(budgetData.currentEngelCoefficient) ? '0' : budgetData.currentEngelCoefficient.toFixed(1)}%
+              </p>
+            </div>
+            <div className="bg-brand-50 p-3 rounded-lg">
+              <IoTrendingUpOutline className="h-6 w-6 text-brand-600" />
+            </div>
+          </div>
+          <div className="mt-2">
+            <Badge className={`${
+              isNaN(budgetData.currentEngelCoefficient) || budgetData.currentEngelCoefficient === 0 ? 'bg-neutral-50 text-neutral-600 border-neutral-200' :
+              budgetData.currentEngelCoefficient > 25 ? 'bg-danger-50 text-danger-600 border-danger-200' :
+              budgetData.currentEngelCoefficient > 20 ? 'bg-warning-50 text-warning-600 border-warning-200' :
+              'bg-success-50 text-success-600 border-success-200'
+            } text-xs px-2 py-1`}>
+              {isNaN(budgetData.currentEngelCoefficient) || budgetData.currentEngelCoefficient === 0 ? 'データなし' :
+               budgetData.currentEngelCoefficient > 25 ? '高め' :
+               budgetData.currentEngelCoefficient > 20 ? '標準' : '理想的'}
+            </Badge>
+          </div>
         </Card>
       </div>
 
-      {/* Category Breakdown */}
-      <Card className="p-6">
-        <div className="flex items-center space-x-2 mb-6">
-          <PieChart className="h-5 w-5 text-gray-600" />
-          <h3 className="text-lg font-semibold text-gray-900">カテゴリ別支出</h3>
+      {/* 生活費入力 */}
+      <Card className="p-6 bg-white border border-neutral-200 shadow-sm rounded-xl">
+        <div className="flex items-center space-x-3 mb-4">
+          <div className="bg-warning-50 p-2 rounded-lg">
+            <IoSaveOutline className="h-5 w-5 text-warning-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-neutral-900">今月の生活費を入力</h3>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {budgetData.categoryData.map((item, index) => (
-            <div
-              key={item.category}
-              className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-            >
-              <div className="flex items-center space-x-3">
-                <span className="text-2xl">
-                  {categoryEmojis[item.category as keyof typeof categoryEmojis] || '📦'}
-                </span>
-                <div>
-                  <p className="font-medium text-gray-900">{item.category}</p>
-                  <Badge className={categoryColors[index % categoryColors.length]}>
-                    {Math.round((item.total / budgetData.thisMonthTotal) * 100)}%
-                  </Badge>
-                </div>
-              </div>
-              <p className="text-lg font-bold text-gray-900">
-                ¥{item.total.toLocaleString()}
-              </p>
-            </div>
-          ))}
+        <div className="flex items-center space-x-4">
+          <Input
+            type="number"
+            placeholder="生活費総額を入力..."
+            value={currentMonthInput}
+            onChange={(e) => setCurrentMonthInput(e.target.value)}
+            className="flex-1"
+          />
+          <Button 
+            onClick={handleSaveLivingExpense}
+            className="bg-warning-600 hover:bg-warning-700 text-white px-6"
+          >
+            保存
+          </Button>
         </div>
+        
+        <p className="text-xs text-neutral-500 mt-2">
+          ※家賃、光熱費、食費、交通費などの生活に必要な総支出額を入力してください
+        </p>
       </Card>
 
-      {/* Recent Purchases */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">今週の購入履歴</h3>
+      {/* 月別推移グラフ */}
+      <Card className="p-6 bg-white border border-neutral-200 shadow-sm rounded-xl">
+        <div className="flex items-center space-x-3 mb-6">
+          <div className="bg-brand-50 p-2 rounded-lg">
+            <IoTrendingUpOutline className="h-5 w-5 text-brand-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-neutral-900">月別支出推移</h3>
+        </div>
         
-        {budgetData.thisWeekItems.length > 0 ? (
-          <div className="space-y-3">
-            {budgetData.thisWeekItems
-              .sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime())
-              .slice(0, 10)
-              .map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center space-x-3">
-                    <span className="text-xl">
-                      {categoryEmojis[item.category as keyof typeof categoryEmojis] || '📦'}
-                    </span>
-                    <div>
-                      <p className="font-medium text-gray-900">{item.name}</p>
-                      <p className="text-sm text-gray-600">
-                        {item.purchaseDate} • {item.category}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-gray-900">¥{item.price.toLocaleString()}</p>
-                    <p className="text-sm text-gray-600">数量: {item.quantity}</p>
-                  </div>
-                </div>
-              ))}
+        {budgetData.monthlyData.some(d => d.foodExpense > 0) ? (
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={budgetData.monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis 
+                  dataKey="month" 
+                  stroke="#6b7280"
+                  fontSize={12}
+                />
+                <YAxis 
+                  yAxisId="left"
+                  stroke="#059669"
+                  fontSize={12}
+                  tickFormatter={(value) => `¥${(value / 1000).toFixed(0)}k`}
+                />
+                <YAxis 
+                  yAxisId="right"
+                  orientation="right"
+                  stroke="#dc2626"
+                  fontSize={12}
+                  tickFormatter={(value) => `${value}%`}
+                  domain={[0, 50]}
+                />
+                <Tooltip 
+                  formatter={(value: number, name) => {
+                    if (name === 'foodExpense') {
+                      return [`¥${value.toLocaleString()}`, '食費'];
+                    } else if (name === 'engelCoefficient') {
+                      return [`${value}%`, 'エンゲル係数'];
+                    } else {
+                      return [`${value}%`, name];
+                    }
+                  }}
+                  labelStyle={{ color: '#374151' }}
+                  contentStyle={{ 
+                    backgroundColor: 'white', 
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Legend 
+                  verticalAlign="top" 
+                  height={36}
+                  formatter={(value) => {
+                    switch(value) {
+                      case 'foodExpense': return '食費';
+                      case 'engelCoefficient': return 'エンゲル係数';
+                      default: return value;
+                    }
+                  }}
+                />
+                {/* 標準エンゲル係数の参考線 */}
+                <ReferenceLine 
+                  yAxisId="right"
+                  y={20} 
+                  stroke="#f59e0b" 
+                  strokeDasharray="8 8"
+                  strokeWidth={2}
+                  label={{ value: "標準 (20%)", position: "topRight", fontSize: 11, fill: "#f59e0b" }}
+                />
+                <ReferenceLine 
+                  yAxisId="right"
+                  y={25} 
+                  stroke="#ef4444" 
+                  strokeDasharray="8 8"
+                  strokeWidth={2}
+                  label={{ value: "高め (25%)", position: "topRight", fontSize: 11, fill: "#ef4444" }}
+                />
+                <Line 
+                  yAxisId="left"
+                  type="monotone" 
+                  dataKey="foodExpense" 
+                  stroke="#059669" 
+                  strokeWidth={3}
+                  dot={{ fill: '#059669', strokeWidth: 2, r: 4 }}
+                  name="foodExpense"
+                />
+                <Line 
+                  yAxisId="right"
+                  type="monotone" 
+                  dataKey="engelCoefficient" 
+                  stroke="#dc2626" 
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  dot={{ fill: '#dc2626', strokeWidth: 2, r: 3 }}
+                  name="engelCoefficient"
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-500">
-            <Calendar className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-            <p>今週の購入履歴がありません</p>
+          <div className="h-80 flex items-center justify-center">
+            <div className="text-center">
+              <div className="bg-neutral-100 p-4 rounded-full mx-auto mb-4 w-fit">
+                <IoTrendingUpOutline className="h-8 w-8 text-neutral-500" />
+              </div>
+              <p className="text-neutral-600">データがまだありません</p>
+              <p className="text-sm text-neutral-500 mt-1">レシートをスキャンして食材を追加すると、支出推移が表示されます</p>
+            </div>
           </div>
         )}
+        
+        {/* エンゲル係数の説明 */}
+        <div className="mt-4 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+          <h4 className="text-sm font-semibold text-neutral-900 mb-2">エンゲル係数について</h4>
+          <div className="text-xs text-neutral-600 space-y-1">
+            <p>• <span className="text-success-600 font-medium">理想的 (20%以下)</span>: 食費が適正で、バランスの良い家計管理</p>
+            <p>• <span className="text-warning-600 font-medium">標準 (20-25%)</span>: 一般的な日本の家庭の食費割合</p>
+            <p>• <span className="text-danger-600 font-medium">高め (25%超)</span>: 食費の見直しや節約を検討することをおすすめ</p>
+          </div>
+        </div>
       </Card>
 
-      {/* Tips */}
-      <Card className="p-4 bg-blue-50 border-blue-200">
-        <div className="text-sm text-blue-800">
-          <h4 className="font-medium mb-2">💡 節約のヒント</h4>
-          <ul className="space-y-1 text-xs">
-            <li>• 賞味期限の近い食材から優先的に使用しましょう</li>
-            <li>• 同じカテゴリの食材が重複購入されていないかチェック</li>
-            <li>• 週の支出目標を設定して管理しましょう</li>
-            <li>• レシピ提案機能を使って食材を無駄なく活用</li>
-          </ul>
+      {/* 購入履歴 */}
+      <Card className="p-6 bg-white border border-neutral-200 shadow-sm rounded-xl">
+        <div className="flex items-center space-x-3 mb-6">
+          <div className="bg-success-50 p-2 rounded-lg">
+            <IoReceiptOutline className="h-5 w-5 text-success-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-neutral-900">今月の購入履歴</h3>
         </div>
+        
+        {budgetData.purchaseHistory.length > 0 ? (
+          <div className="space-y-3">
+            {budgetData.purchaseHistory.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors"
+              >
+                <div>
+                  <p className="font-medium text-neutral-900">{item.name}</p>
+                  <p className="text-sm text-neutral-600 flex items-center">
+                    <IoCalendarOutline className="h-3 w-3 mr-1" />
+                    {item.purchaseDate} • {item.category} • 数量: {item.quantity}
+                  </p>
+                </div>
+                <p className="font-bold text-neutral-900">¥{item.price.toLocaleString()}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <div className="bg-neutral-100 p-4 rounded-full mx-auto mb-4 w-fit">
+              <IoReceiptOutline className="h-8 w-8 text-neutral-500" />
+            </div>
+            <p className="text-neutral-600">今月の購入履歴がありません</p>
+            <p className="text-sm text-neutral-500 mt-1">レシートをスキャンして食材を追加しましょう</p>
+          </div>
+        )}
       </Card>
     </div>
   );

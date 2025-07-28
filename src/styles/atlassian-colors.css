@@ -1,0 +1,129 @@
+/* Atlassian Design System inspired color tokens */
+
+:root {
+  /* Brand colors */
+  --color-brand-50: #e6f3ff;
+  --color-brand-100: #b3d4ff;
+  --color-brand-200: #80b5ff;
+  --color-brand-300: #4d96ff;
+  --color-brand-400: #1a77ff;
+  --color-brand-500: #0065ff;
+  --color-brand-600: #0052cc;
+  --color-brand-700: #003f99;
+  --color-brand-800: #002c66;
+  --color-brand-900: #001933;
+
+  /* Success colors */
+  --color-success-50: #e3fcef;
+  --color-success-100: #abf5d1;
+  --color-success-200: #79f2c0;
+  --color-success-300: #57d9a3;
+  --color-success-400: #36b37e;
+  --color-success-500: #00875a;
+  --color-success-600: #006644;
+  --color-success-700: #004b32;
+  --color-success-800: #003220;
+  --color-success-900: #001e12;
+
+  /* Warning colors */
+  --color-warning-50: #fffae6;
+  --color-warning-100: #fff0b3;
+  --color-warning-200: #ffe680;
+  --color-warning-300: #ffdb4d;
+  --color-warning-400: #ffd11a;
+  --color-warning-500: #ffc400;
+  --color-warning-600: #ff8b00;
+  --color-warning-700: #ff5630;
+  --color-warning-800: #de350b;
+  --color-warning-900: #bf2600;
+
+  /* Danger colors */
+  --color-danger-50: #ffebe6;
+  --color-danger-100: #ffbdad;
+  --color-danger-200: #ff8f73;
+  --color-danger-300: #ff6139;
+  --color-danger-400: #ff5630;
+  --color-danger-500: #de350b;
+  --color-danger-600: #bf2600;
+  --color-danger-700: #9f1f00;
+  --color-danger-800: #7f1800;
+  --color-danger-900: #5f1200;
+
+  /* Discovery colors */
+  --color-discovery-50: #eae6ff;
+  --color-discovery-100: #c0b6f2;
+  --color-discovery-200: #998dd9;
+  --color-discovery-300: #8777d9;
+  --color-discovery-400: #6554c0;
+  --color-discovery-500: #5243aa;
+  --color-discovery-600: #403294;
+  --color-discovery-700: #2d267d;
+  --color-discovery-800: #1a1a66;
+  --color-discovery-900: #0d0e4f;
+
+  /* Neutral colors */
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f7f8f9;
+  --color-neutral-100: #ebecf0;
+  --color-neutral-200: #dfe1e6;
+  --color-neutral-300: #c1c7d0;
+  --color-neutral-400: #b3bac5;
+  --color-neutral-500: #a5adba;
+  --color-neutral-600: #97a0af;
+  --color-neutral-700: #8993a4;
+  --color-neutral-800: #7a869a;
+  --color-neutral-900: #6b778c;
+  --color-neutral-1000: #42526e;
+  --color-neutral-1100: #253858;
+}
+
+/* Tailwind CSS custom color classes */
+.bg-brand-50 { background-color: var(--color-brand-50); }
+.bg-brand-100 { background-color: var(--color-brand-100); }
+.bg-brand-600 { background-color: var(--color-brand-600); }
+.bg-brand-700 { background-color: var(--color-brand-700); }
+
+.bg-success-50 { background-color: var(--color-success-50); }
+.bg-success-600 { background-color: var(--color-success-600); }
+.bg-success-700 { background-color: var(--color-success-700); }
+
+.bg-warning-50 { background-color: var(--color-warning-50); }
+.bg-warning-600 { background-color: var(--color-warning-600); }
+.bg-warning-700 { background-color: var(--color-warning-700); }
+
+.bg-danger-50 { background-color: var(--color-danger-50); }
+.bg-danger-600 { background-color: var(--color-danger-600); }
+.bg-danger-700 { background-color: var(--color-danger-700); }
+
+.bg-discovery-50 { background-color: var(--color-discovery-50); }
+.bg-discovery-600 { background-color: var(--color-discovery-600); }
+.bg-discovery-700 { background-color: var(--color-discovery-700); }
+
+.bg-neutral-50 { background-color: var(--color-neutral-50); }
+.bg-neutral-100 { background-color: var(--color-neutral-100); }
+.bg-neutral-200 { background-color: var(--color-neutral-200); }
+
+.text-brand-600 { color: var(--color-brand-600); }
+.text-success-600 { color: var(--color-success-600); }
+.text-warning-600 { color: var(--color-warning-600); }
+.text-danger-600 { color: var(--color-danger-600); }
+.text-discovery-600 { color: var(--color-discovery-600); }
+.text-neutral-600 { color: var(--color-neutral-600); }
+.text-neutral-900 { color: var(--color-neutral-900); }
+
+.border-neutral-200 { border-color: var(--color-neutral-200); }
+
+.hover\:bg-brand-50:hover { background-color: var(--color-brand-50); }
+.hover\:bg-success-50:hover { background-color: var(--color-success-50); }
+.hover\:bg-warning-50:hover { background-color: var(--color-warning-50); }
+.hover\:bg-danger-50:hover { background-color: var(--color-danger-50); }
+.hover\:bg-discovery-50:hover { background-color: var(--color-discovery-50); }
+
+.hover\:bg-success-700:hover { background-color: var(--color-success-700); }
+.hover\:bg-danger-700:hover { background-color: var(--color-danger-700); }
+
+/* Active state backgrounds */
+.bg-brand-600 { background-color: var(--color-brand-600) !important; }
+.bg-success-600 { background-color: var(--color-success-600) !important; }
+.bg-warning-600 { background-color: var(--color-warning-600) !important; }
+.bg-discovery-600 { background-color: var(--color-discovery-600) !important; }

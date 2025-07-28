@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import { Camera, Bell, ChefHat, Calendar, TrendingUp, Plus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +9,18 @@ import FridgeView from '@/components/FridgeView';
 import TodayBasket from '@/components/TodayBasket';
 import RecipesSuggestion from '@/components/RecipesSuggestion';
 import BudgetOverview from '@/components/BudgetOverview';
+import ExpiringItemsModal from '@/components/ExpiringItemsModal';
+import { 
+  IoCameraOutline, 
+  IoWarningOutline, 
+  IoRestaurant, 
+  IoBasketOutline, 
+  IoSearchOutline,
+  IoWalletOutline,
+  IoSnowOutline
+} from 'react-icons/io5';
+import { MdKitchen } from 'react-icons/md';
+import { CgSmartHomeRefrigerator } from "react-icons/cg";
 
 interface FoodItem {
   id: string;
@@ -28,6 +39,7 @@ const Index = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [activeTab, setActiveTab] = useState('fridge');
   const [todayBasket, setTodayBasket] = useState<FoodItem[]>([]);
+  const [showExpiringModal, setShowExpiringModal] = useState(false);
 
   // Load data from localStorage
   useEffect(() => {
@@ -107,7 +119,11 @@ const Index = () => {
     toast.success('食材を更新しました');
   };
 
-  const getExpiringCount = () => {
+  const addFridgeItem = (newItem: FoodItem) => {
+    setFoodItems(prev => [...prev, newItem]);
+  };
+
+  const getExpiringItems = () => {
     const today = new Date();
     const threeDaysLater = new Date(today);
     threeDaysLater.setDate(threeDaysLater.getDate() + 3);
@@ -115,38 +131,50 @@ const Index = () => {
     return foodItems.filter(item => {
       const expiryDate = new Date(item.expiryDate);
       return expiryDate <= threeDaysLater;
-    }).length;
+    });
+  };
+
+  const getExpiringCount = () => {
+    return getExpiringItems().length;
+  };
+
+  const handleBulkDeleteExpiring = (itemIds: string[]) => {
+    setFoodItems(prev => prev.filter(item => !itemIds.includes(item.id)));
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
+    <div className="min-h-screen bg-neutral-50">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-6xl mx-auto px-4 py-4">
+      <div className="bg-white border-b border-neutral-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="bg-green-100 p-2 rounded-lg">
-                <ChefHat className="h-6 w-6 text-green-600" />
+            <div className="flex items-center space-x-4">
+              <div className="bg-brand-600 p-3 rounded-2xl shadow-md">
+                <CgSmartHomeRefrigerator  className="h-8 w-8 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">スマート冷蔵庫</h1>
-                <p className="text-sm text-gray-600">AI搭載の食材管理システム</p>
+                <h1 className="text-3xl font-bold text-neutral-900">冷蔵庫管理アプリ</h1>
+                <p className="text-sm text-neutral-600 font-medium mt-1"></p>
               </div>
             </div>
             
             <div className="flex items-center space-x-3">
               {getExpiringCount() > 0 && (
-                <Badge variant="destructive" className="animate-pulse">
-                  <Bell className="h-4 w-4 mr-1" />
+                <Badge 
+                  className="bg-danger-600 hover:bg-danger-700 text-white border-0 px-4 py-2 shadow-sm cursor-pointer transition-colors duration-200 rounded-lg"
+                  onClick={() => setShowExpiringModal(true)}
+                >
+                  <IoWarningOutline className="h-4 w-4 mr-2" />
                   期限切れ間近 {getExpiringCount()}件
                 </Badge>
               )}
               
               <Button 
                 onClick={() => setShowScanner(true)}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-success-600 hover:bg-success-700 text-white shadow-sm hover:shadow-md transition-all duration-200 px-4 py-2"
+                size="default"
               >
-                <Camera className="h-4 w-4 mr-2" />
+                <IoCameraOutline className="h-5 w-5 mr-2" />
                 レシート撮影
               </Button>
             </div>
@@ -155,38 +183,41 @@ const Index = () => {
       </div>
 
       {/* Navigation Tabs */}
-      <div className="max-w-6xl mx-auto px-4 py-4">
-        <div className="flex space-x-1 bg-white rounded-lg p-1 shadow-sm">
-          {[
-            { id: 'fridge', label: '冷蔵庫', icon: ChefHat },
-            { id: 'basket', label: '今日の献立', icon: Calendar },
-            { id: 'recipes', label: 'レシピ提案', icon: Plus },
-            { id: 'budget', label: '家計簿', icon: TrendingUp }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-md transition-all ${
-                activeTab === tab.id 
-                  ? 'bg-green-100 text-green-700 shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              <tab.icon className="h-4 w-4" />
-              <span className="font-medium">{tab.label}</span>
-            </button>
-          ))}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="bg-white border border-neutral-200 rounded-xl p-1 shadow-sm">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-1">
+            {[
+              { id: 'fridge', label: '冷蔵庫', icon: CgSmartHomeRefrigerator , color: 'text-brand-600', bgColor: 'hover:bg-brand-50', activeBg: 'bg-brand-600' },
+              { id: 'basket', label: '今日の献立', icon: IoBasketOutline, color: 'text-success-600', bgColor: 'hover:bg-success-50', activeBg: 'bg-success-600' },
+              { id: 'recipes', label: 'レシピ検索', icon: IoRestaurant, color: 'text-warning-600', bgColor: 'hover:bg-warning-50', activeBg: 'bg-warning-600' },
+              { id: 'budget', label: '家計簿', icon: IoWalletOutline, color: 'text-discovery-600', bgColor: 'hover:bg-discovery-50', activeBg: 'bg-discovery-600' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex flex-col items-center justify-center py-4 px-3 rounded-lg transition-all duration-200 font-medium ${
+                  activeTab === tab.id 
+                    ? `${tab.activeBg} text-white shadow-sm` 
+                    : `${tab.color} ${tab.bgColor} hover:shadow-sm`
+                }`}
+              >
+                <tab.icon className="h-6 w-6 mb-1" />
+                <span className="text-sm font-semibold">{tab.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 pb-8">
+      <div className="max-w-6xl mx-auto px-6 pb-12">
         {activeTab === 'fridge' && (
           <FridgeView 
             foodItems={foodItems} 
             onMoveToBasket={moveToBasket}
             onRemoveItem={removeFromFridge}
             onUpdateItem={updateFridgeItem}
+            onAddItem={addFridgeItem}
           />
         )}
         
@@ -195,11 +226,16 @@ const Index = () => {
             basketItems={todayBasket}
             onRemoveItem={removeFromBasket}
             onClearBasket={clearTodayBasket}
+            onUpdateItem={(updatedItem) => {
+              setTodayBasket(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+              // 冷蔵庫の同じアイテムも更新
+              setFoodItems(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+            }}
           />
         )}
         
         {activeTab === 'recipes' && (
-          <RecipesSuggestion foodItems={foodItems} />
+          <RecipesSuggestion foodItems={foodItems} basketItems={todayBasket} />
         )}
         
         {activeTab === 'budget' && (
@@ -214,6 +250,16 @@ const Index = () => {
           onClose={() => setShowScanner(false)}
         />
       )}
+
+      {/* Expiring Items Modal */}
+      <ExpiringItemsModal
+        isOpen={showExpiringModal}
+        onClose={() => setShowExpiringModal(false)}
+        expiringItems={getExpiringItems()}
+        onMoveToBasket={moveToBasket}
+        onRemoveItem={removeFromFridge}
+        onBulkDelete={handleBulkDeleteExpiring}
+      />
     </div>
   );
 };

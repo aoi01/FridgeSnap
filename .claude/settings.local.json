@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev:*)",
+      "Bash(npm run lint)",
+      "Bash(npm run build:*)",
+      "WebFetch(domain:qiita.com)",
+      "Bash(npm install:*)",
+      "Bash(curl:*)",
+      "Bash(node:*)",
+      "Bash(npx madge:*)",
+      "WebFetch(domain:atlassian.design)"
+    ],
+    "deny": []
+  }
+}
