@@ -99,11 +99,11 @@ const ExpiringItemsModal: React.FC<ExpiringItemsModalProps> = ({
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-3">
-            <div className="p-2 bg-warning-50 rounded-lg">
-              <IoWarningOutline className="h-6 w-6 text-warning-600" />
+            <div className="p-2 bg-gradient-to-br from-amber-100 to-orange-100 rounded-xl">
+              <IoWarningOutline className="h-6 w-6 text-amber-600" />
             </div>
-            <span className="text-xl font-semibold text-neutral-900">期限切れ間近の食材</span>
-            <Badge className="bg-warning-600 text-white shadow-sm rounded-md">
+            <span className="text-2xl font-bold text-gray-900">期限切れ間近の食材</span>
+            <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md">
               {expiringItems.length}件
             </Badge>
           </DialogTitle>
@@ -112,11 +112,11 @@ const ExpiringItemsModal: React.FC<ExpiringItemsModalProps> = ({
         <div className="space-y-4 overflow-y-auto max-h-[50vh] pr-2">
           {expiringItems.length === 0 ? (
             <div className="text-center py-12">
-              <div className="p-4 bg-success-50 rounded-full mx-auto mb-4 w-fit">
-                <IoLeaf className="h-12 w-12 text-success-600" />
+              <div className="p-4 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-full mx-auto mb-4 w-fit">
+                <IoLeaf className="h-12 w-12 text-emerald-500" />
               </div>
-              <p className="text-lg font-medium text-neutral-900">期限切れ間近の食材はありません</p>
-              <p className="text-sm text-neutral-600 mt-2">すべての食材が新鮮です！</p>
+              <p className="text-lg font-medium text-gray-700">期限切れ間近の食材はありません</p>
+              <p className="text-sm text-gray-500 mt-2">すべての食材が新鮮です！</p>
             </div>
           ) : (
             expiringItems.map((item) => {
@@ -124,11 +124,11 @@ const ExpiringItemsModal: React.FC<ExpiringItemsModalProps> = ({
               const IconComponent = categoryIcons[item.category as keyof typeof categoryIcons] || IoExtensionPuzzleOutline;
               
               return (
-                <Card key={item.id} className="p-4 bg-white border border-neutral-200 hover:shadow-md hover:border-neutral-300 transition-all duration-200 rounded-lg">
+                <Card key={item.id} className="p-4 bg-gradient-to-r from-slate-50 via-gray-50 to-zinc-50 border border-slate-200 hover:shadow-lg hover:border-slate-300 transition-all duration-300">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3 flex-1">
-                      <div className="p-2 bg-neutral-100 rounded-lg">
-                        <IconComponent className="text-lg text-neutral-600" />
+                    <div className="flex items-center space-x-4 flex-1">
+                      <div className="p-2 bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100 rounded-lg">
+                        <IconComponent className="text-xl text-indigo-600" />
                       </div>
                       
                       <div className="flex-1">
@@ -157,7 +157,7 @@ const ExpiringItemsModal: React.FC<ExpiringItemsModalProps> = ({
                       <Button
                         size="sm"
                         onClick={() => handleMoveToBasket(item)}
-                        className="bg-success-600 hover:bg-success-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
+                        className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-600 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
                       >
                         <IoBasket className="h-4 w-4 mr-2" />
                         今日の献立へ
@@ -167,7 +167,7 @@ const ExpiringItemsModal: React.FC<ExpiringItemsModalProps> = ({
                         size="sm"
                         variant="outline"
                         onClick={() => handleRemoveItem(item.id, item.name)}
-                        className="border-danger-300 text-danger-600 hover:bg-danger-50 hover:border-danger-400 transition-all duration-200"
+                        className="border-rose-300 text-rose-600 hover:bg-rose-50 hover:border-rose-400 hover:text-rose-700 transition-all duration-200 transform hover:scale-105"
                       >
                         <IoTrashOutline className="h-4 w-4 mr-1" />
                         削除

@@ -48,67 +48,205 @@ interface RecipesSuggestionProps {
 
 // --- 環境変数（変更なし） ---
 const RAKUTEN_APP_ID = import.meta.env.VITE_RAKUTEN_APP_ID || 'YOUR_RAKUTEN_APP_ID_HERE';
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// === 親子関係を定義した新しいカテゴリ構造 ===
-interface CategoryNode {
-  name: string;
-  keywords: string[];
-  children?: string[]; // 子カテゴリのIDリスト
-}
-
-const structuredCategoryMap: Record<string, CategoryNode> = {
-  // --- 肉類 ---
-  '10-275': { name: '牛肉', keywords: ['牛肉', '牛', 'ビーフ', 'beef'], children: ['10-275-516', '10-275-822', '10-275-1483'] },
-  '10-275-516': { name: '牛肉薄切り', keywords: ['牛肉薄切り', '牛薄切り'] },
-  '10-275-822': { name: '牛かたまり肉', keywords: ['牛かたまり肉', '牛ステーキ', '牛焼肉', '牛ロース', '牛サーロイン', '牛ヒレ'] },
-  '10-275-1483': { name: '牛タン', keywords: ['牛タン'] },
-  
-  '10-276': { name: '豚肉', keywords: ['豚肉', '豚', 'ポーク', 'pork'], children: ['10-276-830', '10-276-1484', '10-276-1485', '10-276-1486', '10-276-517', '10-276-828', '10-276-829'] },
-  '10-276-830': { name: '豚バラ肉', keywords: ['豚バラ肉', '豚バラ'] },
-  '10-276-1484': { name: '豚ヒレ肉', keywords: ['豚ヒレ肉', '豚ヒレ'] },
-  '10-276-1485': { name: '豚ロース', keywords: ['豚ロース'] },
-  '10-276-1486': { name: '豚もも肉', keywords: ['豚もも肉', '豚もも'] },
-  '10-276-517': { name: '豚薄切り肉', keywords: ['豚薄切り肉', '豚薄切り'] },
-  '10-276-828': { name: '豚かたまり肉', keywords: ['豚かたまり肉'] },
-  '10-276-829': { name: '豚こま切れ肉', keywords: ['豚こま切れ肉', '豚こま'] },
-
-  '10-277': { name: '鶏肉', keywords: ['鶏肉', '鶏', 'チキン', 'chicken'], children: ['10-277-518', '10-277-1119', '10-277-519', '10-277-1488', '10-277-520'] },
-  '10-277-518': { name: '鶏もも肉', keywords: ['鶏もも肉', '鶏もも'] },
-  '10-277-1119': { name: '鶏むね肉', keywords: ['鶏むね肉', '鶏むね'] },
-  '10-277-519': { name: 'ささみ', keywords: ['ささみ', 'ササミ'] },
-  '10-277-1488': { name: '手羽元', keywords: ['手羽元'] },
-  '10-277-520': { name: '手羽先', keywords: ['手羽先'] },
-  
-  '10-278': { name: 'ひき肉', keywords: ['ひき肉', '挽肉', 'ミンチ', '合い挽き', '合挽き'] },
-
-  // --- 魚介類 ---
-  '11': { name: '魚', keywords: ['魚', '魚類', '刺身', '切り身'], children: ['32'] },
-  '32': { name: '定番の魚料理', keywords: ['サーモン', '鮭', 'まぐろ', 'さば', 'いわし', 'あじ', 'ぶり', 'さんま', '鯛', 'たら', 'えび', 'いか', 'たこ', '牡蠣', '貝類'] },
-  
-  // --- 野菜 ---
-  '12': { name: '野菜', keywords: ['野菜', 'なす', 'かぼちゃ', '大根', 'きゅうり', 'じゃがいも', 'さつまいも', 'キャベツ', '白菜', 'トマト', 'もやし', 'ほうれん草', '玉ねぎ', 'ブロッコリー', 'にんじん', 'きのこ'] },
-
-  // --- その他 ---
-  '33': { name: '卵料理', keywords: ['卵', 'たまご'] },
-  '35': { name: '大豆・豆腐', keywords: ['豆腐', '大豆', '納豆', '厚揚げ', '油揚げ'] },
-  '14': { name: 'ご飯もの', keywords: ['米', 'ご飯', 'ごはん'] },
-  '15': { name: 'パスタ', keywords: ['パスタ', 'スパゲティ'] },
-  '17': { name: '汁物・スープ', keywords: ['スープ', '味噌汁', '豚汁'] },
-  '18': { name: 'サラダ', keywords: ['サラダ'] },
-  '23': { name: '鍋料理', keywords: ['鍋'] },
-  '19': { name: '調味料', keywords: ['醤油', '塩', '砂糖', '酢', '油', 'みりん', '酒', 'こしょう', '味噌'] },
-};
-
+import { structuredCategoryMap } from '@/lib/recipeCategories';
 
 const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basketItems }) => {
   const [rakutenRecipes, setRakutenRecipes] = useState<RakutenRecipe[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [useBasketOnly, setUseBasketOnly] = useState(true);
   
-  // レート制限対応のための状態管理
+  // APIレート制限関連のstate
   const [lastRequestTime, setLastRequestTime] = useState<number>(0);
   const [requestCount, setRequestCount] = useState<number>(0);
   const [isRateLimited, setIsRateLimited] = useState<boolean>(false);
+
+  // ★★★ 動的に生成されるカテゴリマップのためのstate ★★★
+  const [categoryMap, setCategoryMap] = useState<Record<string, { name: string; keywords: string[] }> | null>(null);
+  const [isCategoryMapLoading, setIsCategoryMapLoading] = useState(true);
+
+  // --- カテゴリマップの動的構築処理 ---
+  useEffect(() => {
+    const buildCategoryMap = () => {
+      const callbackName = `rakutenCategoryCallback_${Date.now()}`;
+      const script = document.createElement('script');
+
+      const cleanup = () => {
+        delete (window as any)[callbackName];
+        if (document.body.contains(script)) {
+          document.body.removeChild(script);
+        }
+      };
+
+      (window as any)[callbackName] = (data: any) => {
+        if (data && data.result) {
+          const newCategoryMap: Record<string, { name: string; keywords: string[] }> = {};
+          // 大カテゴリ
+          data.result.large.forEach((cat: any) => {
+            newCategoryMap[cat.categoryId] = { name: cat.categoryName, keywords: [cat.categoryName] };
+          });
+          // 中カテゴリ (親IDと連結)
+          data.result.medium.forEach((cat: any) => {
+            const combinedId = `${cat.parentCategoryId}-${cat.categoryId}`;
+            newCategoryMap[combinedId] = { name: cat.categoryName, keywords: [cat.categoryName] };
+          });
+          // 小カテゴリ (親IDと連結)
+          data.result.small.forEach((cat: any) => {
+            const combinedId = `${cat.parentCategoryId}-${cat.categoryId}`;
+            newCategoryMap[combinedId] = { name: cat.categoryName, keywords: [cat.categoryName] };
+          });
+          
+          setCategoryMap(newCategoryMap);
+          console.log('楽天レシピのカテゴリマップを動的に構築しました。', newCategoryMap);
+          toast.success('レシピカテゴリの準備ができました');
+        } else {
+          toast.error('レシピカテゴリの取得に失敗しました。');
+        }
+        setIsCategoryMapLoading(false);
+        cleanup();
+      };
+
+      script.src = `https://app.rakuten.co.jp/services/api/Recipe/CategoryList/20170426?applicationId=${RAKUTEN_APP_ID}&format=jsonp&callback=${callbackName}`;
+      script.onerror = () => {
+        toast.error('カテゴリAPIの読み込みに失敗しました。');
+        setIsCategoryMapLoading(false);
+        cleanup();
+      };
+
+      document.body.appendChild(script);
+    };
+
+    if (RAKUTEN_APP_ID !== 'YOUR_RAKUTEN_APP_ID_HERE') {
+      buildCategoryMap();
+    }
+  }, [RAKUTEN_APP_ID]);
+
+  useEffect(() => {
+    if (RAKUTEN_APP_ID === 'YOUR_RAKUTEN_APP_ID_HERE') {
+      toast.warning('楽天APIキーが設定されていません', {
+        description: '.envファイルに VITE_RAKUTEN_APP_ID を追加してください。',
+        duration: 8000,
+      });
+    }
+    if (!GEMINI_API_KEY) {
+      toast.warning('Gemini APIキーが設定されていません', {
+        description: '.envファイルに VITE_GEMINI_API_KEY を追加してください。',
+        duration: 8000,
+      });
+    }
+  }, []);
+
+  const processIngredientsWithGemini = async (ingredients: string[]): Promise<string[]> => {
+    if (!GEMINI_API_KEY) {
+      toast.error('Gemini APIキーが設定されていないため、高度な食材名処理をスキップします。');
+      return ingredients;
+    }
+
+    const processingToast = toast.loading('AIが食材名を最適化中...');
+
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `以下の食材リストを、楽天レシピAPIでの検索に最適化された一般的な食材名のリストに変換してください。産地、ブランド名、量、余分な説明（「切り落とし」など）はすべて取り除き、最も基本的な食材名のみを抽出してください。結果は "ingredients" というキーを持つJSON配列で返してください。\n\n入力リスト: ${JSON.stringify(ingredients)}\n\n例:\n入力: ["国産若鶏もも肉(徳用)", "こくうま絹豆腐 3個パック"]\n出力: {"ingredients": ["鶏もも肉", "豆腐"]}`
+            }]
+          }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gemini API request failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (!content) {
+        throw new Error('Gemini APIからの応答が不正です');
+      }
+
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('Gemini APIから有効なJSONを取得できませんでした');
+      }
+
+      const parsedData = JSON.parse(jsonMatch[0]);
+      toast.success('食材名をAIで最適化しました！', { id: processingToast });
+      
+      console.log('Gemini processed ingredients:', parsedData.ingredients);
+      return parsedData.ingredients || ingredients;
+
+    } catch (error) {
+      console.error('Error processing ingredients with Gemini:', error);
+      toast.error('AIによる食材名の処理中にエラーが発生しました。', { id: processingToast });
+      return ingredients; // エラー時も元のリストを返す
+    }
+  };
+
+  const filterRecipesWithGemini = async (recipes: RakutenRecipe[], userIngredients: string[]): Promise<number[]> => {
+    if (!GEMINI_API_KEY) {
+      toast.error('Gemini APIキーが設定されていないため、高度なレシピフィルタリングをスキップします。');
+      return recipes.map(r => r.recipeId);
+    }
+
+    const filteringToast = toast.loading('AIがレシピを厳選中...');
+
+    const recipesForPrompt = recipes.map(r => ({
+      recipeId: r.recipeId,
+      recipeTitle: r.recipeTitle,
+      recipeMaterial: r.recipeMaterial
+    }));
+
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `あなたは賢いレシピ判定アシスタントです。\nユーザーが持っている食材リストと、複数のレシピ候補が渡されます。\nユーザーの食材リストに書かれている食材が、レシピの材料リストに実質的に含まれているかどうかを判定してください。\n\nユーザーの食材: ${JSON.stringify(userIngredients)}\n\nレシピ候補リスト: ${JSON.stringify(recipesForPrompt)}\n\n判定基準:\n- ユーザーの食材が1つ以上、レシピ材料に含まれていること。\n- 表記揺れ（例：「豚肉」と「豚バラ肉」、「豆腐」と「絹ごし豆腐」）は同一とみなす。\n- 明らかに関係のないレシピは除外する。\n\n上記の基準を満たすレシピの recipeId のみを、"matchedRecipeIds" というキーを持つJSON配列で返してください。\n\n例:\n入力(ユーザー食材): ["豚肉", "玉ねぎ"]\n入力(レシピ候補): [{recipeId: 1, recipeTitle: "豚の生姜焼き", recipeMaterial: ["豚ロース肉", "玉ねぎ"]}, {recipeId: 2, recipeTitle: "鶏の唐揚げ", recipeMaterial: ["鶏もも肉", "醤油"]}]\n出力: {"matchedRecipeIds": [1]}`
+            }]
+          }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gemini API request failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (!content) {
+        throw new Error('Gemini APIからの応答が不正です');
+      }
+
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('Gemini APIから有効なJSONを取得できませんでした');
+      }
+
+      const parsedData = JSON.parse(jsonMatch[0]);
+      toast.success('AIによるレシピの厳選が完了！', { id: filteringToast });
+      
+      console.log('Gemini filtered recipe IDs:', parsedData.matchedRecipeIds);
+      return parsedData.matchedRecipeIds || [];
+
+    } catch (error) {
+      console.error('Error filtering recipes with Gemini:', error);
+      toast.error('AIによるレシピの厳選中にエラーが発生しました。', { id: filteringToast });
+      return [];
+    }
+  };
+
 
   // レート制限管理関数（改良版：1.5秒間隔を採用）
   const canMakeRequest = (): boolean => {
@@ -139,7 +277,8 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
     
     if (timeSinceLastRequest < 60000) {
       setRequestCount(prev => prev + 1);
-    } else {
+    }
+    else {
       setRequestCount(1);
     }
     
@@ -170,26 +309,58 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
 
   // --- 食材名の正規化（変更なし） ---
   const normalizeIngredientForSearch = (ingredient: string): string => {
-    let normalized = ingredient.replace(/[0-9]+[個本匹枚袋パックgkgml]?/g, '');
+    // レシピ検索に不要な汎用的な単語を削除
+    const unnecessaryWords = [
+      '国内産', '国産', '外国産', '産',
+      '切り落とし', 'スライス', 'ブロック', 'カット',
+      '徳用', 'お買得', 'ジャンボパック', '使い切り', '少量', '大容量', 'パック',
+      '若鶏', 'バラ凍結'
+    ];
+    const regex = new RegExp(unnecessaryWords.join('|'), 'g');
+    let normalized = ingredient.replace(regex, '');
+
+    // 数量や記号を削除
+    normalized = normalized.replace(/[0-9]+[個本匹枚袋パックgkgml]?/g, '');
     normalized = normalized.replace(/[（）()【】\[\]]/g, '');
     normalized = normalized.replace(/[・×〜～−－]/g, '');
     normalized = normalized.trim();
     
+    // 表記揺れを統一するためのマップ
     const ingredientNormalizationMap: Record<string, string> = {
-      '鶏モモ': '鶏もも肉', '鶏ムネ': '鶏むね肉', '豚ロース': '豚ロース肉', '豚こま': '豚こま切れ肉',
-      '牛ロース': '牛肉', 'ひき肉': 'ひき肉', '挽肉': 'ひき肉', 'サーモン': '鮭',
-      'ツナ': 'まぐろ', 'マグロ': 'まぐろ', 'たまねぎ': '玉ねぎ', 'タマネギ': '玉ねぎ',
-      'ニンジン': 'にんじん', '人参': 'にんじん', 'ジャガイモ': 'じゃがいも',
-      'しょうゆ': '醤油', 'ごはん': 'ご飯', 'たまご': '卵', 'チキン': '鶏肉', 'ポーク': '豚肉', 'ビーフ': '牛肉',
+      // 肉類
+      '鶏モモ': '鶏もも肉', '鶏ムネ': '鶏むね肉', 'チキン': '鶏肉',
+      '豚ロース': '豚ロース肉', '豚こま': '豚こま切れ肉', 'ポーク': '豚肉', '豚バラ': '豚バラ肉',
+      '牛ロース': '牛肉', 'ビーフ': '牛肉',
+      'ひき肉': 'ひき肉', '挽肉': 'ひき肉',
+
+      // 魚介類
+      'サーモン': '鮭', 'ツナ': 'まぐろ', 'マグロ': 'まぐろ',
+
+      // 野菜
+      'たまねぎ': '玉ねぎ', 'タマネギ': '玉ねぎ', '玉葱': '玉ねぎ',
+      'にんじん': 'にんじん', 'ニンジン': 'にんじん', '人参': 'にんじん',
+      'じゃがいも': 'じゃがいも', 'ジャガイモ': 'じゃがいも', 'じゃが芋': 'じゃがいも',
+      'ピーマン': 'ピーマン', 'ぴーまん': 'ピーマン',
+      'なす': 'なす', 'ナス': 'なす',
+      'きゅうり': 'きゅうり', 'キュウリ': 'きゅうり',
+
+      // 大豆製品
+      '絹豆腐': '豆腐', '木綿豆腐': '豆腐', '焼き豆腐': '豆腐', 'とうふ': '豆腐',
+
+      // その他
+      'しょうゆ': '醤油', 'ごはん': 'ご飯', 'たまご': '卵',
     };
     
     const mappedIngredient = ingredientNormalizationMap[normalized] || normalized;
-    // console.log(`Ingredient normalization: "${ingredient}" -> "${mappedIngredient}"`);
-    return mappedIngredient;
+    return mappedIngredient.trim();
   };
 
-  // --- レート制限対応のJSONPリクエスト関数 ---
-  const fetchRakutenRecipesByCategory = async (categoryId: string): Promise<RakutenRecipe[]> => {
+  // --- レート制限対応のJSONPリクエスト関数（改良版） ---
+  const fetchRakutenRecipesByCategories = async (categoryIds: string[]): Promise<RakutenRecipe[]> => {
+    if (categoryIds.length === 0) return [];
+    
+    const categoryIdString = categoryIds.join(',');
+
     // レート制限チェックと待機
     await waitForRateLimit();
     
@@ -206,21 +377,19 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
       };
 
       const timeout = setTimeout(() => {
-        console.error(`API request timeout for category ${categoryId}`);
+        console.error(`API request timeout for categories ${categoryIdString}`);
         cleanup();
         resolve([]);
-      }, 15000); // タイムアウトを15秒に延長
+      }, 15000);
 
       (window as any)[callbackName] = (data: any) => {
-        updateRequestStatus(); // リクエスト完了時にカウント更新
+        updateRequestStatus();
         
         if (data && data.error) {
-          console.error(`API error for category ${categoryId}:`, data.error);
+          console.error(`API error for categories ${categoryIdString}:`, data.error);
           if (data.error === 'too_many_requests') {
-            console.log('Rate limit detected, will wait longer for next request');
             setIsRateLimited(true);
-            // 次回のリクエストのために追加待機時間を設定
-            setLastRequestTime(Date.now() + 30000); // 30秒追加待機
+            setLastRequestTime(Date.now() + 30000);
           }
           cleanup();
           resolve([]);
@@ -228,21 +397,20 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
         }
         
         if (data && data.result) {
-          console.log(`Successfully fetched ${data.result.length} recipes from category ${categoryId}`);
+          console.log(`Successfully fetched ${data.result.length} recipes from categories ${categoryIdString}`);
           resolve(data.result);
         } else {
-          console.error(`No result data for category ${categoryId}:`, data);
+          console.error(`No result data for categories ${categoryIdString}:`, data);
           resolve([]);
         }
         cleanup();
       };
 
-      // リクエスト前にカウント更新
       updateRequestStatus();
       
-      script.src = `https://app.rakuten.co.jp/services/api/Recipe/CategoryRanking/20170426?applicationId=${RAKUTEN_APP_ID}&categoryId=${categoryId}&callback=${callbackName}`;
+      script.src = `https://app.rakuten.co.jp/services/api/Recipe/CategoryRanking/20170426?applicationId=${RAKUTEN_APP_ID}&categoryId=${categoryIdString}&callback=${callbackName}`;
       script.onerror = () => {
-        console.error(`Rakuten Recipe API request failed for category ${categoryId}`);
+        console.error(`Rakuten Recipe API request failed for categories ${categoryIdString}`);
         cleanup();
         resolve([]);
       };
@@ -251,137 +419,50 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
     });
   };
 
-  // ★★★ 改良版: より効率的なカテゴリマッピング（ブログ記事の戦略を採用） ★★★
+  // ★★★ 改良版: 動的カテゴリマップを使用してカテゴリを検索 ★★★
   const mapIngredientsToCategories = (ingredients: string[]): string[] => {
+    if (!categoryMap) return [];
+
     const normalizedIngredients = ingredients.map(normalizeIngredientForSearch);
     const matchedCategoryIds = new Set<string>();
 
     normalizedIngredients.forEach(ingredient => {
-      Object.entries(structuredCategoryMap).forEach(([categoryId, categoryNode]) => {
-        const isMatch = categoryNode.keywords.some(keyword => ingredient.includes(keyword));
-
-        if (isMatch) {
-          // 詳細カテゴリを優先的に追加（大・中・小分類戦略）
-          if (categoryNode.children && categoryNode.children.length > 0) {
-            // 子カテゴリがある場合、子カテゴリを優先
-            categoryNode.children.forEach(childId => {
-              matchedCategoryIds.add(childId);
-            });
-            // 親カテゴリも念のため追加
-            matchedCategoryIds.add(categoryId);
-          } else {
-            // 子カテゴリがない場合は親カテゴリを追加
-            matchedCategoryIds.add(categoryId);
-          }
+      Object.entries(categoryMap).forEach(([categoryId, categoryData]) => {
+        // 食材名とカテゴリ名のキーワードが部分一致するかチェック
+        if (categoryData.keywords.some(keyword => ingredient.includes(keyword) || keyword.includes(ingredient))) {
+          matchedCategoryIds.add(categoryId);
         }
       });
     });
 
     const finalCategories = Array.from(matchedCategoryIds);
-    console.log('Matched categories (detailed strategy):', finalCategories);
+    console.log('Matched categories from dynamic map:', finalCategories);
 
-    // マッチしなかった場合のフォールバック（より具体的な詳細カテゴリを含む）
+    // マッチしなかった場合のフォールバック
     if (finalCategories.length === 0) {
-      const fallbackCategories = [
-        '10-276-830', '10-277-518', '10-275-516', // 豚バラ、鶏もも、牛薄切り
-        '32', '12', '33' // 定番魚料理、野菜、卵
-      ];
-      console.log('Using detailed fallback categories:', fallbackCategories);
+      const fallbackCategories = ['10', '11', '12', '13', '14']; // 主要な大カテゴリ
+      console.log('Using fallback categories:', fallbackCategories);
       return fallbackCategories;
     }
 
-    // 詳細カテゴリを優先的にソート（ブログ記事の戦略）
-    const priorityOrder = [
-      // 詳細な肉類カテゴリを最優先
-      '10-276-830', '10-276-1484', '10-276-1485', '10-276-1486', // 豚肉詳細
-      '10-277-518', '10-277-1119', '10-277-519', // 鶏肉詳細
-      '10-275-516', '10-275-822', '10-275-1483', // 牛肉詳細
-      // 親カテゴリ
-      '10-276', '10-277', '10-275', '10-278',
-      // その他カテゴリ
-      '32', '12', '33', '35', '14', '17', '23'
-    ];
-    
-    finalCategories.sort((a, b) => {
-      const aIndex = priorityOrder.findIndex(id => id === a);
-      const bIndex = priorityOrder.findIndex(id => id === b);
-      const aScore = aIndex !== -1 ? aIndex : Infinity;
-      const bScore = bIndex !== -1 ? bIndex : Infinity;
-      return aScore - bScore;
-    });
-
-    // 検索効率化のため、最大5カテゴリに制限
-    return finalCategories.slice(0, 5);
+    return finalCategories.slice(0, 10); // 検索するカテゴリ数を最大10に制限
   };
 
-  // --- レシピフィルタリングとスコアリング（改良版） ---
+  // --- レシピフィルタリングとスコアリング（Geminiがメインのため簡素化） ---
   const checkRecipeContainsIngredients = (recipe: RakutenRecipe, availableIngredients: string[]): boolean => {
-      if (availableIngredients.length === 0) return true; // 材料がなければ全レシピOK
-      
-      const recipeMaterials = recipe.recipeMaterial || [];
-      const normalizedRecipeMaterials = recipeMaterials.map(m => normalizeIngredientForSearch(m));
-      
-      console.log(`Checking recipe: "${recipe.recipeTitle}"`);
-      console.log(`Available ingredients:`, availableIngredients);
-      console.log(`Recipe materials (normalized):`, normalizedRecipeMaterials);
-      
-      const hasMatch = availableIngredients.some(ownedIngredient => {
-          const matchFound = normalizedRecipeMaterials.some(recipeIngredient => {
-              // より柔軟なマッチング条件
-              let isMatch = false;
-              
-              // 完全一致または部分一致
-              if (recipeIngredient.includes(ownedIngredient) || ownedIngredient.includes(recipeIngredient)) {
-                  isMatch = true;
-              }
-              
-              // 肉類の特殊マッチング
-              if (!isMatch && ownedIngredient.includes('肉')) {
-                  const meatTypes = ['豚', '牛', '鶏', 'ひき肉', 'バラ', 'ロース', 'もも', 'むね', 'ささみ'];
-                  isMatch = meatTypes.some(meat => 
-                      (ownedIngredient.includes(meat) && recipeIngredient.includes(meat)) ||
-                      (ownedIngredient.includes('豚') && recipeIngredient.includes('ポーク')) ||
-                      (ownedIngredient.includes('牛') && recipeIngredient.includes('ビーフ')) ||
-                      (ownedIngredient.includes('鶏') && recipeIngredient.includes('チキン'))
-                  );
-              }
-              
-              // 野菜の柔軟マッチング
-              if (!isMatch) {
-                  const commonMatches = [
-                      ['玉ねぎ', 'たまねぎ', 'タマネギ', 'オニオン'],
-                      ['にんじん', 'ニンジン', '人参', 'キャロット'],
-                      ['じゃがいも', 'ジャガイモ', 'ポテト'],
-                      ['トマト', 'とまと'],
-                      ['きゅうり', 'キュウリ'],
-                      ['キャベツ', 'きゃべつ']
-                  ];
-                  
-                  isMatch = commonMatches.some(group => 
-                      group.some(variant => ownedIngredient.includes(variant)) &&
-                      group.some(variant => recipeIngredient.includes(variant))
-                  );
-              }
-              
-              if (isMatch) {
-                  console.log(`✓ Match found: "${ownedIngredient}" <-> "${recipeIngredient}"`);
-              }
-              return isMatch;
-          });
-          return matchFound;
-      });
-      
-      console.log(`Recipe "${recipe.recipeTitle}" has match:`, hasMatch);
-      return hasMatch;
+      if (availableIngredients.length === 0) return true;
+      const recipeMaterials = recipe.recipeMaterial.map(m => normalizeIngredientForSearch(m));
+      return availableIngredients.some(ownedIngredient => 
+          recipeMaterials.some(recipeIngredient => recipeIngredient.includes(ownedIngredient) || ownedIngredient.includes(recipeIngredient))
+      );
   };
 
   const calculateRecipeScore = (recipe: RakutenRecipe, availableIngredients: string[]): number => {
       let score = 0;
       const recipeMaterials = recipe.recipeMaterial.map(m => normalizeIngredientForSearch(m));
-      
       availableIngredients.forEach(ownedIngredient => {
           if (recipeMaterials.some(recipeIngredient => recipeIngredient.includes(ownedIngredient))) {
-              score += 1; // 1材料マッチごとに1点
+              score += 1;
           }
       });
       return score;
@@ -401,123 +482,48 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
     }
 
     setIsLoading(true);
-    setRakutenRecipes([]); // 検索開始時に前回の結果をクリア
+    setRakutenRecipes([]);
 
     try {
-      const ingredientNames = itemsToUse.map(item => item.name);
-      // ★改良された関数を呼び出す
-      const categoriesToSearch = mapIngredientsToCategories(ingredientNames);
+      const originalIngredientNames = itemsToUse.map(item => item.name);
       
-      // 改良版重複チェック（ブログ記事の戦略を採用）
-      const uniqueRecipes = new Map<number, RakutenRecipe>();
-      const duplicateCount = { total: 0 };
-      const maxCategories = 5; // 詳細カテゴリ戦略に合わせて増加
+      // Gemini APIで食材名を処理
+      const processedIngredientNames = await processIngredientsWithGemini(originalIngredientNames);
 
-      for (let i = 0; i < Math.min(categoriesToSearch.length, maxCategories); i++) {
-        const categoryId = categoriesToSearch[i];
-        
-        // レート制限チェック
-        if (isRateLimited) {
-          console.log('Rate limited, skipping remaining requests');
-          break;
-        }
-        
-        console.log(`Fetching recipes from category ${categoryId} (${i + 1}/${Math.min(categoriesToSearch.length, maxCategories)})...`);
-        
-        try {
-          const recipes = await fetchRakutenRecipesByCategory(categoryId);
-          
-          if (recipes.length > 0) {
-            let newRecipeCount = 0;
-            recipes.forEach(recipe => {
-              if (!uniqueRecipes.has(recipe.recipeId)) {
-                uniqueRecipes.set(recipe.recipeId, recipe);
-                newRecipeCount++;
-              } else {
-                duplicateCount.total++;
-              }
-            });
-            console.log(`Category ${categoryId}: ${recipes.length} fetched, ${newRecipeCount} new, ${recipes.length - newRecipeCount} duplicates`);
-            console.log(`Total unique recipes: ${uniqueRecipes.size}, total duplicates: ${duplicateCount.total}`);
-          } else {
-            console.log(`No recipes found in category ${categoryId}`);
-          }
-        } catch (error) {
-          console.error(`Error fetching from category ${categoryId}:`, error);
-        }
-        
-        // ブログ記事推奨の1.5秒待機時間
-        if (i < Math.min(categoriesToSearch.length, maxCategories) - 1 && !isRateLimited) {
-          console.log('Waiting before next request...');
-          await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5秒待機（推奨値）
-        }
-      }
-
-      const allFetchedRecipes = Array.from(uniqueRecipes.values());
+      const categoriesToSearch = mapIngredientsToCategories(processedIngredientNames);
+      
+      // ★★★ 改良されたロジック：複数カテゴリを一度にリクエスト ★★★
+      const allFetchedRecipes = await fetchRakutenRecipesByCategories(categoriesToSearch);
+      
       console.log(`=== API検索完了サマリー ===`);
-      console.log(`検索カテゴリ数: ${Math.min(categoriesToSearch.length, maxCategories)}`);
+      console.log(`検索カテゴリ: ${categoriesToSearch.join(', ')}`);
       console.log(`ユニークレシピ取得数: ${allFetchedRecipes.length}`);
-      console.log(`重複レシピ数: ${duplicateCount.total}`);
-      console.log(`総APIリクエスト数: ${Math.min(categoriesToSearch.length, maxCategories)}`);
 
-      const normalizedIngredientNames = ingredientNames.map(normalizeIngredientForSearch);
-      console.log(`Normalized ingredient names for filtering:`, normalizedIngredientNames);
+      // ★★★ Gemini APIでレシピをフィルタリング ★★★
+      const normalizedIngredientNames = processedIngredientNames.map(normalizeIngredientForSearch);
+      const matchedRecipeIds = await filterRecipesWithGemini(allFetchedRecipes, normalizedIngredientNames);
 
-      // フィルタリング前にレシピタイトルを確認
-      console.log(`Recipe titles before filtering:`, allFetchedRecipes.map(r => r.recipeTitle));
+      const finalRecipes = allFetchedRecipes.filter(recipe => matchedRecipeIds.includes(recipe.recipeId));
 
-      const filteredAndScoredRecipes = allFetchedRecipes
-        .filter(recipe => {
-            // 今日の献立モードの場合、より柔軟なフィルタリング
-            if (useBasketOnly && normalizedIngredientNames.length > 0) {
-                // 今日の献立の食材が1つでも含まれていればOK
-                const hasMatch = checkRecipeContainsIngredients(recipe, normalizedIngredientNames);
-                console.log(`Recipe "${recipe.recipeTitle}" passed filter (basket mode):`, hasMatch);
-                return hasMatch;
-            } else if (!useBasketOnly) {
-                // 冷蔵庫全体モードの場合、既存のロジック
-                const hasMatch = checkRecipeContainsIngredients(recipe, normalizedIngredientNames);
-                console.log(`Recipe "${recipe.recipeTitle}" passed filter (fridge mode):`, hasMatch);
-                return hasMatch;
-            } else {
-                // 食材がない場合は全部表示
-                return true;
-            }
-        })
-        .map(recipe => ({
-          recipe,
-          score: calculateRecipeScore(recipe, normalizedIngredientNames)
-        }));
+      console.log(`AIによるフィルタリング後のレシピ数: ${finalRecipes.length}`);
 
-      console.log(`Recipes after filtering: ${filteredAndScoredRecipes.length}`);
-
-      let sortedRecipes = filteredAndScoredRecipes
-        .sort((a, b) => b.score - a.score)
-        .map(item => item.recipe);
-      
       // フィルタリング後にレシピが0件の場合、フォールバック
-      if (sortedRecipes.length === 0 && allFetchedRecipes.length > 0) {
-        console.log('No recipes passed filtering, showing all fetched recipes as fallback');
-        sortedRecipes = allFetchedRecipes.slice(0, 10);
-        toast.warning('完全一致するレシピは見つかりませんでしたが、関連レシピを表示します。', {
-          description: '食材を追加するか、冷蔵庫全体から検索してみてください'
+      if (finalRecipes.length === 0 && allFetchedRecipes.length > 0) {
+        console.log('AIフィルタリングで一致するレシピがなかったため、フォールバック表示します。');
+        const fallbackRecipes = allFetchedRecipes.slice(0, 10);
+        setRakutenRecipes(fallbackRecipes);
+        toast.warning('AIが関連性の高いレシピを見つけられませんでした。', {
+          description: '代わりに取得した全てのレシピ候補を表示します。',
         });
-      }
-      
-      const displayRecipes = sortedRecipes.slice(0, 10); // 表示件数を10件に
-      setRakutenRecipes(displayRecipes);
+      } else {
+        const displayRecipes = finalRecipes.slice(0, 10); // 表示件数を10件に
+        setRakutenRecipes(displayRecipes);
 
-      if (displayRecipes.length > 0 && filteredAndScoredRecipes.length > 0) {
-        toast.success(`レシピが${displayRecipes.length}件見つかりました！`, {
-          description: `${Math.min(categoriesToSearch.length, maxCategories)}カテゴリから${allFetchedRecipes.length}件取得（重複${duplicateCount.total}件除外）`
-        });
-      } else if (displayRecipes.length > 0) {
-        // フォールバック表示の場合
-        toast.info(`関連レシピ${displayRecipes.length}件を表示中`, {
-          description: `${allFetchedRecipes.length}件から選択（完全一致なし）`
-        });
-      } else if (displayRecipes.length === 0) {
-        toast.error('レシピが見つかりませんでした。食材を追加するか、別のカテゴリを試してください。');
+        if (displayRecipes.length > 0) {
+          toast.success(`AIが${displayRecipes.length}件の関連レシピを厳選しました！`);
+        } else {
+          toast.error('関連するレシピが見つかりませんでした。');
+        }
       }
 
     } catch (error) {
@@ -540,13 +546,13 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
           <div className="flex items-center justify-between">
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-warning-50 rounded-lg">
-                  <IoCube className="text-lg text-warning-600" />
+                <div className="p-2 bg-brand-50 rounded-lg">
+                  <IoRestaurant className="text-lg text-brand-600" />
                 </div>
-                <h3 className="font-semibold text-neutral-900 text-lg">レシピ検索に使用する食材を選択</h3>
+                <h3 className="font-semibold text-neutral-900 text-lg">今日の献立からレシピを提案</h3>
               </div>
               <p className="text-sm text-neutral-600">
-                今日の献立の食材を優先して検索するか、冷蔵庫の全食材から検索するかを選択できます
+                「今日の献立」の食材を使ってレシピを検索します。冷蔵庫全体の食材からも検索できます。
               </p>
             </div>
             <div className="flex space-x-3">
@@ -604,7 +610,7 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
             
             <Button
               onClick={searchRakutenRecipes}
-              disabled={isLoading || isRateLimited || (useBasketOnly ? basketItems.length === 0 : foodItems.length === 0)}
+              disabled={isLoading || isRateLimited || isCategoryMapLoading || (useBasketOnly ? basketItems.length === 0 : foodItems.length === 0)}
               className={`transition-all duration-200 shadow-sm hover:shadow-md px-6 py-2 ${
                 isRateLimited 
                   ? "bg-orange-500 hover:bg-orange-600"
@@ -614,7 +620,12 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
               } text-white`}
               size="default"
             >
-              {isLoading ? (
+              {isCategoryMapLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <span className="font-medium">カテゴリ準備中...</span>
+                </>
+              ) : isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   <span className="font-medium">検索中...</span>
@@ -684,12 +695,10 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
                       const availableIngredients = itemsToUse.map(item => normalizeIngredientForSearch(item.name));
                       
                       const isAvailable = availableIngredients.some(available => {
-                        const normalizedIngredient = ingredient.replace(/[0-9]+.*/, '').replace(/[◎★※・]/g, '').trim();
+                        const normalizedRecipeIngredient = normalizeIngredientForSearch(ingredient.replace(/[0-9]+.*/, '').replace(/[◎★※・]/g, '').trim());
                         
-                        return normalizedIngredient.includes(available) || 
-                               available.includes(normalizedIngredient) ||
-                               (available.length >= 2 && normalizedIngredient.includes(available)) ||
-                               (normalizedIngredient.length >= 2 && available.includes(normalizedIngredient));
+                        return normalizedRecipeIngredient.includes(available) || 
+                               available.includes(normalizedRecipeIngredient);
                       });
                       
                       return (

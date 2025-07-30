@@ -313,7 +313,7 @@ const BudgetOverview: React.FC<BudgetOverviewProps> = ({ foodItems }) => {
                   stroke="#f59e0b" 
                   strokeDasharray="8 8"
                   strokeWidth={2}
-                  label={{ value: "標準 (20%)", position: "topRight", fontSize: 11, fill: "#f59e0b" }}
+                  label={{ value: "標準 (20%)", position: "right", fontSize: 11, fill: "#f59e0b" }}
                 />
                 <ReferenceLine 
                   yAxisId="right"
@@ -321,7 +321,7 @@ const BudgetOverview: React.FC<BudgetOverviewProps> = ({ foodItems }) => {
                   stroke="#ef4444" 
                   strokeDasharray="8 8"
                   strokeWidth={2}
-                  label={{ value: "高め (25%)", position: "topRight", fontSize: 11, fill: "#ef4444" }}
+                  label={{ value: "高め (25%)", position: "right", fontSize: 11, fill: "#ef4444" }}
                 />
                 <Line 
                   yAxisId="left"

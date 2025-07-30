@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 
+import Webcam from 'react-webcam';
+
 interface FoodItem {
   id: string;
   name: string;
@@ -32,73 +34,21 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-
-  useEffect(() => {
-    return () => {
-      // Cleanup camera stream when component unmounts
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, [stream]);
-
-  const startCamera = async () => {
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment', // Use back camera if available
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      });
-      
-      setStream(mediaStream);
-      setShowCamera(true);
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        videoRef.current.play();
-      }
-    } catch (error) {
-      console.error('Camera access error:', error);
-      toast.error('カメラにアクセスできませんでした。ブラウザの設定を確認してください。');
-    }
-  };
-
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-    setShowCamera(false);
-  };
+  const webcamRef = useRef<Webcam>(null);
 
   const capturePhoto = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
-    
-    if (!context) return;
-    
-    // Set canvas dimensions to match video
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    
-    // Draw the video frame to canvas
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
-    // Convert canvas to blob
-    canvas.toBlob(async (blob) => {
-      if (blob) {
-        stopCamera();
-        await processReceiptImage(new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' }));
-      }
-    }, 'image/jpeg', 0.9);
+    if (!webcamRef.current) {
+      toast.error('カメラが正しく初期化されていません');
+      return;
+    }
+    const imageSrc = webcamRef.current.getScreenshot();
+    if (imageSrc) {
+      const blob = await fetch(imageSrc).then(res => res.blob());
+      await processReceiptImage(new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' }));
+      setShowCamera(false);
+    } else {
+      toast.error('写真の撮影に失敗しました');
+    }
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -226,7 +176,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
       <Card className={`w-full ${showCamera ? 'max-w-2xl' : 'max-w-md'} p-6 bg-white`}>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold">レシートをスキャン</h2>
-          <Button variant="ghost" size="sm" onClick={() => { stopCamera(); onClose(); }}>
+          <Button variant="ghost" size="sm" onClick={() => { setShowCamera(false); onClose(); }}>
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -234,19 +184,23 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
         {showCamera ? (
           <div className="space-y-4">
             <div className="relative bg-black rounded-lg overflow-hidden">
-              <video
-                ref={videoRef}
+              <Webcam
+                audio={false}
+                ref={webcamRef}
+                screenshotFormat="image/jpeg"
                 className="w-full h-64 object-cover"
-                autoPlay
-                playsInline
-                muted
+                videoConstraints={{ facingMode: "environment" }}
               />
-              <canvas ref={canvasRef} className="hidden" />
+              <div className="absolute inset-4 border-2 border-white border-dashed rounded-lg pointer-events-none opacity-50">
+                <div className="absolute top-2 left-2 text-white text-xs bg-black bg-opacity-50 px-2 py-1 rounded">
+                  レシートをここに合わせてください
+                </div>
+              </div>
             </div>
             
             <div className="flex justify-center space-x-4">
               <Button
-                onClick={stopCamera}
+                onClick={() => setShowCamera(false)}
                 variant="outline"
                 className="px-6"
                 disabled={isLoading}
@@ -255,18 +209,18 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
               </Button>
               <Button
                 onClick={capturePhoto}
-                className="bg-success-600 hover:bg-success-700 text-white px-6"
+                className="bg-success-600 hover:bg-success-700 text-white px-8 py-3"
                 disabled={isLoading}
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                     分析中...
                   </>
                 ) : (
                   <>
-                    <Camera className="h-4 w-4 mr-2" />
-                    撮影
+                    <Camera className="h-5 w-5 mr-2" />
+                    撮影する
                   </>
                 )}
               </Button>
@@ -285,7 +239,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
           <div className="space-y-4">
             <div className="grid grid-cols-1 gap-3">
               <Button
-                onClick={startCamera}
+                onClick={() => setShowCamera(true)}
                 disabled={isLoading}
                 className="w-full h-20 border-2 border-dashed border-brand-300 hover:border-brand-400 bg-brand-50 hover:bg-brand-100 transition-colors text-brand-700 hover:text-brand-800"
                 variant="outline"
