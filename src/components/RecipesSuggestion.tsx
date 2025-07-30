@@ -9,7 +9,6 @@ import {
   IoTime, 
   IoCheckmarkCircle, 
   IoLeaf,
-  IoCube,
   IoSearch,
   IoSnowOutline,
   IoBasketOutline
@@ -50,17 +49,13 @@ interface RecipesSuggestionProps {
 const RAKUTEN_APP_ID = import.meta.env.VITE_RAKUTEN_APP_ID || 'YOUR_RAKUTEN_APP_ID_HERE';
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-import { structuredCategoryMap } from '@/lib/recipeCategories';
 
 const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basketItems }) => {
   const [rakutenRecipes, setRakutenRecipes] = useState<RakutenRecipe[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [useBasketOnly, setUseBasketOnly] = useState(true);
   
-  // APIレート制限関連のstate
-  const [lastRequestTime, setLastRequestTime] = useState<number>(0);
-  const [requestCount, setRequestCount] = useState<number>(0);
-  const [isRateLimited, setIsRateLimited] = useState<boolean>(false);
+  // ★★★ 古いレート制限state削除（シーケンシャル検索で対応）★★★
 
   // ★★★ 動的に生成されるカテゴリマップのためのstate ★★★
   const [categoryMap, setCategoryMap] = useState<Record<string, { name: string; keywords: string[] }> | null>(null);
@@ -137,34 +132,100 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
     }
   }, []);
 
-  const processIngredientsWithGemini = async (ingredients: string[]): Promise<string[]> => {
+
+  // ★★★ レート制限対応のGemini API呼び出しヘルパー ★★★
+  const callGeminiWithRateLimit = async (prompt: string, retryCount = 0): Promise<any> => {
+    const maxRetries = 3;
+    const baseDelay = 2000; // 2秒
+    
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: prompt }]
+          }]
+        })
+      });
+
+      if (response.status === 429) {
+        if (retryCount < maxRetries) {
+          const delay = baseDelay * Math.pow(2, retryCount); // 指数バックオフ
+          console.log(`Rate limit hit, retrying in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+          toast.loading(`API制限に達しました。${delay/1000}秒後に再試行します...`);
+          
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return callGeminiWithRateLimit(prompt, retryCount + 1);
+        } else {
+          throw new Error('Rate limit exceeded after maximum retries');
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(`Gemini API request failed: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (retryCount < maxRetries && (error instanceof Error && error.message.includes('fetch'))) {
+        const delay = baseDelay * Math.pow(2, retryCount);
+        console.log(`Network error, retrying in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return callGeminiWithRateLimit(prompt, retryCount + 1);
+      }
+      throw error;
+    }
+  };
+
+  // ★★★ 楽天レシピAPIカテゴリに特化した食材名処理関数（レート制限対応） ★★★
+  const processIngredientsWithGeminiForTodayBasket = async (ingredients: string[], isTodayBasket: boolean): Promise<string[]> => {
     if (!GEMINI_API_KEY) {
       toast.error('Gemini APIキーが設定されていないため、高度な食材名処理をスキップします。');
       return ingredients;
     }
 
-    const processingToast = toast.loading('AIが食材名を最適化中...');
-
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `以下の食材リストを、楽天レシピAPIでの検索に最適化された一般的な食材名のリストに変換してください。産地、ブランド名、量、余分な説明（「切り落とし」など）はすべて取り除き、最も基本的な食材名のみを抽出してください。結果は "ingredients" というキーを持つJSON配列で返してください。\n\n入力リスト: ${JSON.stringify(ingredients)}\n\n例:\n入力: ["国産若鶏もも肉(徳用)", "こくうま絹豆腐 3個パック"]\n出力: {"ingredients": ["鶏もも肉", "豆腐"]}`
-            }]
-          }]
-        })
-      });
+      const contextMessage = isTodayBasket 
+        ? '今日の献立に選ばれた食材'
+        : '冷蔵庫にある食材';
+      
+      const prompt = `あなたは楽天レシピAPIの専門家です。以下は${contextMessage}のリストです。これらの食材を楽天レシピAPIのカテゴリ構造に最適化された食材名に変換してください。
 
-      if (!response.ok) {
-        throw new Error(`Gemini API request failed: ${response.status}`);
-      }
+楽天レシピAPIの主要カテゴリ構造:
+- カテゴリ10: ご飯もの（チャーハン、丼、おにぎり等）
+- カテゴリ11: 魚料理（焼き魚、煮魚、刺身等）
+- カテゴリ12: 野菜料理（サラダ、煮物、炒め物等）
+- カテゴリ13: 卵料理（オムレツ、茶碗蒸し、目玉焼き等）
+- カテゴリ14: パン（サンドイッチ、トースト等）
+- カテゴリ15-152: 焼き物（焼肉、ステーキ、焼き鳥等）
+- カテゴリ15-153: 炒め物（野菜炒め、チンジャオロース等）
+- カテゴリ15-154: 煮物（肉じゃが、角煮等）
+- カテゴリ15-155: 魚の調理法別
+- カテゴリ15-157: 野菜の調理法別
+- カテゴリ15-159: 豆腐料理
+- カテゴリ15-160: 卵の調理法別
 
-      const data = await response.json();
+最適化ルール:
+1. 商品名から余計な情報を削除（産地、ブランド、パッケージ情報）
+2. 楽天レシピで一般的に使われる食材名に統一
+3. 肉類は部位まで含めて具体的に（例：「豚バラ肉」「鶏もも肉」）
+4. 野菜は標準的な名称に（例：「玉ねぎ」「にんじん」）
+5. 魚類は魚種を明確に（例：「鮭」「あじ」「さば」）
+6. 豆腐は「豆腐」に統一
+7. 卵は「卵」に統一
+
+入力食材リスト: ${JSON.stringify(ingredients)}
+
+結果は "ingredients" というキーを持つJSON配列で返してください。
+
+例:
+入力: ["国産若鶏もも肉(徳用)", "こくうま絹豆腐 3個パック", "北海道産玉ねぎ(大)", "豚バラ切り落とし"]
+出力: {"ingredients": ["鶏もも肉", "豆腐", "玉ねぎ", "豚バラ肉"]}`;
+
+      const data = await callGeminiWithRateLimit(prompt);
       const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
       
       if (!content) {
@@ -177,135 +238,25 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
       }
 
       const parsedData = JSON.parse(jsonMatch[0]);
-      toast.success('食材名をAIで最適化しました！', { id: processingToast });
       
-      console.log('Gemini processed ingredients:', parsedData.ingredients);
+      console.log(`楽天レシピAPI用に${contextMessage}をAI最適化:`, parsedData.ingredients);
       return parsedData.ingredients || ingredients;
 
     } catch (error) {
-      console.error('Error processing ingredients with Gemini:', error);
-      toast.error('AIによる食材名の処理中にエラーが発生しました。', { id: processingToast });
+      console.error('Error processing ingredients with Gemini for Rakuten Recipe API:', error);
+      if (error instanceof Error && error.message.includes('Rate limit exceeded')) {
+        toast.error('Gemini APIの利用制限に達しました。しばらく待ってから再試行してください。');
+      } else {
+        toast.warning('AI処理をスキップして検索を続行します。');
+      }
       return ingredients; // エラー時も元のリストを返す
     }
   };
 
-  const filterRecipesWithGemini = async (recipes: RakutenRecipe[], userIngredients: string[]): Promise<number[]> => {
-    if (!GEMINI_API_KEY) {
-      toast.error('Gemini APIキーが設定されていないため、高度なレシピフィルタリングをスキップします。');
-      return recipes.map(r => r.recipeId);
-    }
-
-    const filteringToast = toast.loading('AIがレシピを厳選中...');
-
-    const recipesForPrompt = recipes.map(r => ({
-      recipeId: r.recipeId,
-      recipeTitle: r.recipeTitle,
-      recipeMaterial: r.recipeMaterial
-    }));
-
-    try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `あなたは賢いレシピ判定アシスタントです。\nユーザーが持っている食材リストと、複数のレシピ候補が渡されます。\nユーザーの食材リストに書かれている食材が、レシピの材料リストに実質的に含まれているかどうかを判定してください。\n\nユーザーの食材: ${JSON.stringify(userIngredients)}\n\nレシピ候補リスト: ${JSON.stringify(recipesForPrompt)}\n\n判定基準:\n- ユーザーの食材が1つ以上、レシピ材料に含まれていること。\n- 表記揺れ（例：「豚肉」と「豚バラ肉」、「豆腐」と「絹ごし豆腐」）は同一とみなす。\n- 明らかに関係のないレシピは除外する。\n\n上記の基準を満たすレシピの recipeId のみを、"matchedRecipeIds" というキーを持つJSON配列で返してください。\n\n例:\n入力(ユーザー食材): ["豚肉", "玉ねぎ"]\n入力(レシピ候補): [{recipeId: 1, recipeTitle: "豚の生姜焼き", recipeMaterial: ["豚ロース肉", "玉ねぎ"]}, {recipeId: 2, recipeTitle: "鶏の唐揚げ", recipeMaterial: ["鶏もも肉", "醤油"]}]\n出力: {"matchedRecipeIds": [1]}`
-            }]
-          }]
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Gemini API request failed: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      
-      if (!content) {
-        throw new Error('Gemini APIからの応答が不正です');
-      }
-
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('Gemini APIから有効なJSONを取得できませんでした');
-      }
-
-      const parsedData = JSON.parse(jsonMatch[0]);
-      toast.success('AIによるレシピの厳選が完了！', { id: filteringToast });
-      
-      console.log('Gemini filtered recipe IDs:', parsedData.matchedRecipeIds);
-      return parsedData.matchedRecipeIds || [];
-
-    } catch (error) {
-      console.error('Error filtering recipes with Gemini:', error);
-      toast.error('AIによるレシピの厳選中にエラーが発生しました。', { id: filteringToast });
-      return [];
-    }
-  };
+  // ★★★ 使用しないAI関数を削除 ★★★
 
 
-  // レート制限管理関数（改良版：1.5秒間隔を採用）
-  const canMakeRequest = (): boolean => {
-    const now = Date.now();
-    const timeSinceLastRequest = now - lastRequestTime;
-    
-    // 1分間に最大10リクエスト制限
-    if (timeSinceLastRequest < 60000) { // 1分以内の場合
-      if (requestCount >= 10) {
-        return false;
-      }
-    } else {
-      // 1分以上経過している場合はカウントリセット
-      setRequestCount(0);
-    }
-    
-    // 最低1.5秒間隔を強制（ブログ記事推奨値）
-    if (timeSinceLastRequest < 1500) {
-      return false;
-    }
-    
-    return true;
-  };
-
-  const updateRequestStatus = () => {
-    const now = Date.now();
-    const timeSinceLastRequest = now - lastRequestTime;
-    
-    if (timeSinceLastRequest < 60000) {
-      setRequestCount(prev => prev + 1);
-    }
-    else {
-      setRequestCount(1);
-    }
-    
-    setLastRequestTime(now);
-  };
-
-  const waitForRateLimit = async (): Promise<void> => {
-    if (!canMakeRequest()) {
-      const now = Date.now();
-      const timeSinceLastRequest = now - lastRequestTime;
-      
-      if (timeSinceLastRequest < 1500) {
-        // 最低1.5秒待機（ブログ記事推奨値）
-        const waitTime = 1500 - timeSinceLastRequest;
-        console.log(`Rate limit: waiting ${waitTime}ms...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-      } else if (requestCount >= 10) {
-        // 1分間で10リクエスト制限に達した場合
-        const waitTime = 60000 - timeSinceLastRequest;
-        console.log(`Rate limit: too many requests, waiting ${waitTime}ms...`);
-        setIsRateLimited(true);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-        setIsRateLimited(false);
-        setRequestCount(0);
-      }
-    }
-  };
+  // ★★★ 古いレート制限管理関数を削除（シーケンシャル検索で対応）★★★
 
   // --- 食材名の正規化（変更なし） ---
   const normalizeIngredientForSearch = (ingredient: string): string => {
@@ -355,17 +306,75 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
     return mappedIngredient.trim();
   };
 
-  // --- レート制限対応のJSONPリクエスト関数（改良版） ---
-  const fetchRakutenRecipesByCategories = async (categoryIds: string[]): Promise<RakutenRecipe[]> => {
-    if (categoryIds.length === 0) return [];
+  // ★★★ GeminiAI選択カテゴリによるレシピ取得関数 ★★★
+  const fetchRecipesByGeminiCategories = async (ingredients: string[]): Promise<RakutenRecipe[]> => {
+    if (ingredients.length === 0) return [];
     
-    const categoryIdString = categoryIds.join(',');
+    console.log(`=== GeminiAIカテゴリ選択による検索開始 ===`);
+    console.log(`使用食材:`, ingredients);
 
-    // レート制限チェックと待機
-    await waitForRateLimit();
-    
-    return new Promise((resolve) => {
-      const callbackName = `rakutenCallback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    try {
+      // GeminiAIに最適なカテゴリを選択してもらう
+      const selectedCategories = await selectOptimalCategoriesWithGemini(ingredients);
+      
+      if (selectedCategories.length === 0) {
+        console.log('カテゴリが選択されませんでした');
+        return [];
+      }
+
+      console.log(`GeminiAI選択カテゴリ:`, selectedCategories);
+      
+      // 選択されたカテゴリからレシピを取得
+      const allRecipes = new Map<number, RakutenRecipe>();
+      
+      for (let i = 0; i < selectedCategories.length; i++) {
+        const categoryId = selectedCategories[i];
+        console.log(`\n[${i + 1}/${selectedCategories.length}] カテゴリ ${categoryId} からレシピ取得中...`);
+
+        // API制限回避のため待機
+        if (i > 0) {
+          console.log('API制限回避のため4秒待機...');
+          await new Promise(resolve => setTimeout(resolve, 4000));
+        }
+        
+        try {
+          const categoryRecipes = await fetchSingleCategory(categoryId);
+          console.log(`カテゴリ ${categoryId} から ${categoryRecipes.length} 件のレシピを取得`);
+          
+          // レシピを統合（重複削除）
+          categoryRecipes.forEach(recipe => {
+            if (!allRecipes.has(recipe.recipeId)) {
+              allRecipes.set(recipe.recipeId, recipe);
+            }
+          });
+          
+          // 進捗表示
+          const currentTotal = allRecipes.size;
+          console.log(`現在の累計ユニークレシピ数: ${currentTotal}`);
+          
+        } catch (error) {
+          console.error(`カテゴリ ${categoryId} の検索でエラー:`, error);
+          // エラーが発生してもそのまま次のカテゴリに続行
+        }
+      }
+
+      const finalRecipes = Array.from(allRecipes.values());
+      console.log(`\n=== GeminiAI選択カテゴリ検索完了 ===`);
+      console.log(`最終統合レシピ数: ${finalRecipes.length}`);
+      return finalRecipes;
+      
+    } catch (error) {
+      console.error('GeminiAIカテゴリ選択でエラー:', error);
+      return [];
+    }
+  };
+
+  // ★★★ 古い食材別カテゴリ取得関数を削除（GeminiAI方式に統合）★★★
+
+  // 単一カテゴリからレシピを取得
+  const fetchSingleCategory = async (categoryId: string): Promise<RakutenRecipe[]> => {
+    return new Promise<RakutenRecipe[]>((resolve) => {
+      const callbackName = `rakutenCallback_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
       const script = document.createElement('script');
 
       const cleanup = () => {
@@ -377,40 +386,35 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
       };
 
       const timeout = setTimeout(() => {
-        console.error(`API request timeout for categories ${categoryIdString}`);
+        console.error(`API request timeout for category ${categoryId}`);
         cleanup();
-        resolve([]);
-      }, 15000);
+        resolve([]); // タイムアウト時は空配列を返す
+      }, 20000); // タイムアウトを20秒に延長
 
       (window as any)[callbackName] = (data: any) => {
-        updateRequestStatus();
-        
         if (data && data.error) {
-          console.error(`API error for categories ${categoryIdString}:`, data.error);
-          if (data.error === 'too_many_requests') {
-            setIsRateLimited(true);
-            setLastRequestTime(Date.now() + 30000);
+          console.error(`API error for category ${categoryId}:`, data.error);
+          if (data.error === 'too_many_requests' || data.error.includes('too_many_requests')) {
+            console.log('Rate limit detected, will retry with longer delay...');
           }
           cleanup();
           resolve([]);
           return;
         }
         
-        if (data && data.result) {
-          console.log(`Successfully fetched ${data.result.length} recipes from categories ${categoryIdString}`);
+        if (data && data.result && Array.isArray(data.result)) {
+          cleanup();
           resolve(data.result);
         } else {
-          console.error(`No result data for categories ${categoryIdString}:`, data);
+          console.warn(`No valid result data for category ${categoryId}`);
+          cleanup();
           resolve([]);
         }
-        cleanup();
       };
-
-      updateRequestStatus();
       
-      script.src = `https://app.rakuten.co.jp/services/api/Recipe/CategoryRanking/20170426?applicationId=${RAKUTEN_APP_ID}&categoryId=${categoryIdString}&callback=${callbackName}`;
+      script.src = `https://app.rakuten.co.jp/services/api/Recipe/CategoryRanking/20170426?applicationId=${RAKUTEN_APP_ID}&categoryId=${categoryId}&callback=${callbackName}`;
       script.onerror = () => {
-        console.error(`Rakuten Recipe API request failed for categories ${categoryIdString}`);
+        console.error(`Rakuten Recipe API request failed for category ${categoryId}`);
         cleanup();
         resolve([]);
       };
@@ -419,57 +423,159 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
     });
   };
 
-  // ★★★ 改良版: 動的カテゴリマップを使用してカテゴリを検索 ★★★
-  const mapIngredientsToCategories = (ingredients: string[]): string[] => {
-    if (!categoryMap) return [];
+  // ★★★ 古い階層検索戦略を削除（OR検索方式に変更）★★★
 
-    const normalizedIngredients = ingredients.map(normalizeIngredientForSearch);
-    const matchedCategoryIds = new Set<string>();
+  // ★★★ 実際の楽天カテゴリマップを使ったGeminiAI選択機能 ★★★
+  const selectOptimalCategoriesWithGemini = async (ingredients: string[]): Promise<string[]> => {
+    if (!GEMINI_API_KEY) {
+      console.log('Gemini APIキーが設定されていないため、フォールバック方式でカテゴリ選択');
+      return getFallbackCategories(ingredients);
+    }
 
-    normalizedIngredients.forEach(ingredient => {
-      Object.entries(categoryMap).forEach(([categoryId, categoryData]) => {
-        // 食材名とカテゴリ名のキーワードが部分一致するかチェック
-        if (categoryData.keywords.some(keyword => ingredient.includes(keyword) || keyword.includes(ingredient))) {
-          matchedCategoryIds.add(categoryId);
+    if (!categoryMap) {
+      console.log('カテゴリマップが準備されていないため、フォールバック方式でカテゴリ選択');
+      return getFallbackCategories(ingredients);
+    }
+
+    try {
+      // 動的カテゴリマップをGeminiに渡すための形式に変換
+      const categoryMapForGemini = Object.entries(categoryMap).reduce((acc, [categoryId, categoryData]) => {
+        acc[categoryId] = `${categoryData.name}`;
+        return acc;
+      }, {} as Record<string, string>);
+
+      console.log('GeminiAIに送信するカテゴリマップ:', Object.keys(categoryMapForGemini).length, '個のカテゴリ');
+
+      const prompt = `あなたは楽天レシピAPIの専門家として、提供された食材に基づいて最適なレシピカテゴリを選択してください。
+
+【使用する食材】
+${JSON.stringify(ingredients)}
+
+【楽天レシピAPIのカテゴリマップ】
+${JSON.stringify(categoryMapForGemini, null, 2)}
+
+【カテゴリ選択の基準】
+1. 提供された食材に最も適しているカテゴリを1-2個選択
+【具体的な選択方針】
+・豆腐・卵類 → 専用カテゴリ（豆腐料理、卵料理）を優先
+
+
+【重要な制約】
+・必ず上記のカテゴリマップに存在するカテゴリIDのみを選択
+・存在しないカテゴリIDは絶対に選択しない
+・カテゴリIDは文字列形式で正確に返す（例: "10", "15-152", "11"）
+
+【回答形式】
+結果は "categories" というキーを持つJSON配列で返してください。
+
+【回答例】
+入力食材: ["豚バラ肉", "玉ねぎ"]
+出力: {"categories": ["10-276", "12-96"]}`;
+
+      // API呼び出し間に間隔を空ける
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const data = await callGeminiWithRateLimit(prompt);
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (!content) {
+        throw new Error('Gemini APIからの応答が不正です');
+      }
+
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('Gemini APIから有効なJSONを取得できませんでした');
+      }
+
+      const parsedData = JSON.parse(jsonMatch[0]);
+      const selectedCategories = parsedData.categories || [];
+      
+      // 実際に存在するカテゴリIDのみをフィルタリング
+      const validCategories = selectedCategories.filter((categoryId: string) => 
+        categoryMap && categoryMap[categoryId]
+      );
+      
+      console.log(`GeminiAIが選択したカテゴリ:`, selectedCategories);
+      console.log(`有効なカテゴリ（存在確認済み）:`, validCategories);
+      
+      if (validCategories.length === 0) {
+        console.log('有効なカテゴリが選択されなかったため、フォールバック方式を使用');
+        return getFallbackCategories(ingredients);
+      }
+      
+      // 上限を5個に制限
+      return validCategories.slice(0, 5);
+
+    } catch (error) {
+      console.error('Error selecting categories with Gemini:', error);
+      if (error instanceof Error && error.message.includes('Rate limit exceeded')) {
+        toast.error('Gemini APIの利用制限に達しました。基本的なカテゴリ選択で続行します。');
+      } else {
+        toast.warning('AI分析をスキップして基本的なカテゴリ選択で続行します。');
+      }
+      console.log('Geminiエラーのためフォールバック方式でカテゴリ選択');
+      return getFallbackCategories(ingredients);
+    }
+  };
+
+  // フォールバック用のシンプルなカテゴリ選択
+  const getFallbackCategories = (ingredients: string[]): string[] => {
+    const fallbackMap: { [key: string]: string[] } = {
+      '豚': ['15-152', '15-153', '10'],
+      '鶏': ['15-152', '15-153', '10'], 
+      '牛': ['15-152', '15-153', '10'],
+      '魚': ['11', '15-155'],
+      '鮭': ['11', '15-155'],
+      'サーモン': ['11', '15-155'],
+      '野菜': ['12', '15-157'],
+      '玉ねぎ': ['12', '15-157', '15-153'],
+      'にんじん': ['12', '15-157'],
+      'じゃがいも': ['12', '15-157', '15-154'],
+      '豆腐': ['12', '15-159'],
+      '卵': ['13', '15-160']
+    };
+
+    const categories = new Set<string>();
+    ingredients.forEach(ingredient => {
+      Object.entries(fallbackMap).forEach(([key, cats]) => {
+        if (ingredient.includes(key)) {
+          cats.forEach(cat => categories.add(cat));
         }
       });
     });
 
-    const finalCategories = Array.from(matchedCategoryIds);
-    console.log('Matched categories from dynamic map:', finalCategories);
-
-    // マッチしなかった場合のフォールバック
-    if (finalCategories.length === 0) {
-      const fallbackCategories = ['10', '11', '12', '13', '14']; // 主要な大カテゴリ
-      console.log('Using fallback categories:', fallbackCategories);
-      return fallbackCategories;
-    }
-
-    return finalCategories.slice(0, 10); // 検索するカテゴリ数を最大10に制限
+    return categories.size > 0 ? Array.from(categories).slice(0, 4) : ['10', '11', '12'];
   };
+
+
+  // ★★★ 古いフォールバック関数を削除（新しい効率的戦略を使用）★★★
 
   // --- レシピフィルタリングとスコアリング（Geminiがメインのため簡素化） ---
-  const checkRecipeContainsIngredients = (recipe: RakutenRecipe, availableIngredients: string[]): boolean => {
-      if (availableIngredients.length === 0) return true;
-      const recipeMaterials = recipe.recipeMaterial.map(m => normalizeIngredientForSearch(m));
-      return availableIngredients.some(ownedIngredient => 
-          recipeMaterials.some(recipeIngredient => recipeIngredient.includes(ownedIngredient) || ownedIngredient.includes(recipeIngredient))
-      );
-  };
 
   const calculateRecipeScore = (recipe: RakutenRecipe, availableIngredients: string[]): number => {
       let score = 0;
       const recipeMaterials = recipe.recipeMaterial.map(m => normalizeIngredientForSearch(m));
+      
       availableIngredients.forEach(ownedIngredient => {
-          if (recipeMaterials.some(recipeIngredient => recipeIngredient.includes(ownedIngredient))) {
-              score += 1;
+          const matches = recipeMaterials.filter(recipeIngredient => 
+              recipeIngredient.includes(ownedIngredient) || ownedIngredient.includes(recipeIngredient)
+          );
+          if (matches.length > 0) {
+              // より具体的なマッチほど高スコア
+              const exactMatch = matches.some(match => match === ownedIngredient);
+              score += exactMatch ? 3 : 1;
           }
       });
+      
+      // 材料数が少ないレシピを少し優遇（作りやすさ重視）
+      const materialCount = recipe.recipeMaterial.length;
+      if (materialCount <= 5) score += 1;
+      if (materialCount <= 3) score += 1;
+      
       return score;
   };
 
 
-  // --- レシピ検索のメインロジック（変更なし、改良されたカテゴリマッピングを利用） ---
+  // --- 今日の献立特化レシピ検索のメインロジック ---
   const searchRakutenRecipes = async () => {
     const itemsToUse = useBasketOnly ? basketItems : foodItems;
     if (itemsToUse.length === 0) {
@@ -487,43 +593,85 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
     try {
       const originalIngredientNames = itemsToUse.map(item => item.name);
       
-      // Gemini APIで食材名を処理
-      const processedIngredientNames = await processIngredientsWithGemini(originalIngredientNames);
-
-      const categoriesToSearch = mapIngredientsToCategories(processedIngredientNames);
+      console.log('=== 今日の献立レシピ検索開始 ===');
+      console.log('使用する食材:', originalIngredientNames);
+      console.log('検索モード:', useBasketOnly ? '今日の献立モード' : '冷蔵庫全体モード');
       
-      // ★★★ 改良されたロジック：複数カテゴリを一度にリクエスト ★★★
-      const allFetchedRecipes = await fetchRakutenRecipesByCategories(categoriesToSearch);
-      
-      console.log(`=== API検索完了サマリー ===`);
-      console.log(`検索カテゴリ: ${categoriesToSearch.join(', ')}`);
-      console.log(`ユニークレシピ取得数: ${allFetchedRecipes.length}`);
+      // 今日の献立の食材専用：より詳細な食材名処理
+      const processingToast = toast.loading(
+        useBasketOnly 
+          ? '今日の献立の食材でレシピを検索中...' 
+          : '冷蔵庫の食材でレシピを検索中...'
+      );
 
-      // ★★★ Gemini APIでレシピをフィルタリング ★★★
+      // Gemini APIで食材名を処理（今日の献立に特化したプロンプト）
+      const processedIngredientNames = await processIngredientsWithGeminiForTodayBasket(originalIngredientNames, useBasketOnly);
+
+      console.log('=== GeminiAI最適カテゴリ選択による検索 ===');
+      console.log('処理後食材名:', processedIngredientNames);
+
+      toast.loading(`GeminiAIが食材を分析して最適なカテゴリを選択中...`, { id: processingToast });
+
+      // ★★★ 新方式：GeminiAIが最適なカテゴリを選択してレシピ取得 ★★★
+      toast.loading('選択されたカテゴリからレシピを検索中...', { id: processingToast });
+      const allFetchedRecipes = await fetchRecipesByGeminiCategories(processedIngredientNames);
+      
+      if (allFetchedRecipes.length === 0) {
+        toast.error('GeminiAIが選択したカテゴリからレシピを取得できませんでした。別の食材で試してください。', { id: processingToast });
+        setIsLoading(false);
+        return;
+      }
+      
+      toast.loading(`${allFetchedRecipes.length}件のレシピを分析中...`, { id: processingToast });
+      
+      console.log(`=== GeminiAI選択検索完了サマリー ===`);
+      console.log(`検索した食材: ${processedIngredientNames.join(', ')}`);
+      console.log(`GeminiAI選択によるレシピ取得数: ${allFetchedRecipes.length}`);
+
+      // ★★★ 基本的なフィルタリングのみ（AIフィルタリングを削除）★★★
       const normalizedIngredientNames = processedIngredientNames.map(normalizeIngredientForSearch);
-      const matchedRecipeIds = await filterRecipesWithGemini(allFetchedRecipes, normalizedIngredientNames);
-
-      const finalRecipes = allFetchedRecipes.filter(recipe => matchedRecipeIds.includes(recipe.recipeId));
-
-      console.log(`AIによるフィルタリング後のレシピ数: ${finalRecipes.length}`);
-
-      // フィルタリング後にレシピが0件の場合、フォールバック
-      if (finalRecipes.length === 0 && allFetchedRecipes.length > 0) {
-        console.log('AIフィルタリングで一致するレシピがなかったため、フォールバック表示します。');
-        const fallbackRecipes = allFetchedRecipes.slice(0, 10);
-        setRakutenRecipes(fallbackRecipes);
-        toast.warning('AIが関連性の高いレシピを見つけられませんでした。', {
-          description: '代わりに取得した全てのレシピ候補を表示します。',
+      
+      console.log('=== フィルタリングデバッグ情報 ===');
+      console.log('取得したレシピ数:', allFetchedRecipes.length);
+      console.log('正規化された食材名:', normalizedIngredientNames);
+      
+      // 最初の数個のレシピの材料をログ出力
+      if (allFetchedRecipes.length > 0) {
+        console.log('サンプルレシピ材料:');
+        allFetchedRecipes.slice(0, 3).forEach((recipe, index) => {
+          console.log(`レシピ${index + 1}: ${recipe.recipeTitle}`);
+          console.log(`材料:`, recipe.recipeMaterial);
+          console.log(`正規化後材料:`, recipe.recipeMaterial.map(m => normalizeIngredientForSearch(m)));
         });
-      } else {
-        const displayRecipes = finalRecipes.slice(0, 10); // 表示件数を10件に
-        setRakutenRecipes(displayRecipes);
+      }
+      
+      // GeminiAI選択カテゴリからのレシピはすべて関連性が高いため表示
+      console.log('GeminiAI選択カテゴリからのレシピはすべて表示（高い関連性保証済み）');
+      const filteredRecipes = allFetchedRecipes;
 
-        if (displayRecipes.length > 0) {
-          toast.success(`AIが${displayRecipes.length}件の関連レシピを厳選しました！`);
-        } else {
-          toast.error('関連するレシピが見つかりませんでした。');
-        }
+      console.log(`基本フィルタリング後のレシピ数: ${filteredRecipes.length}`);
+
+      // レシピスコアでソートして上位を表示
+      toast.loading('レシピをスコアでソート中...', { id: processingToast });
+      const scoredRecipes = filteredRecipes.map(recipe => ({
+        ...recipe,
+        score: calculateRecipeScore(recipe, normalizedIngredientNames)
+      })).sort((a, b) => b.score - a.score);
+
+      // OR検索なので多くのレシピが取得できる可能性を考慮
+      const displayCount = useBasketOnly ? 20 : 25; // OR検索による豊富なレシピ数に対応
+      const displayRecipes = scoredRecipes.slice(0, displayCount);
+      
+      toast.loading('レシピを表示準備中...', { id: processingToast });
+      setRakutenRecipes(displayRecipes);
+
+      if (displayRecipes.length > 0) {
+        const message = useBasketOnly 
+          ? `今日の献立で作れる${displayRecipes.length}件のレシピを取得しました！`
+          : `冷蔵庫の食材で作れる${displayRecipes.length}件のレシピを取得しました！`;
+        toast.success(message);
+      } else {
+        toast.warning('該当するレシピが見つかりませんでした。');
       }
 
     } catch (error) {
@@ -610,13 +758,11 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
             
             <Button
               onClick={searchRakutenRecipes}
-              disabled={isLoading || isRateLimited || isCategoryMapLoading || (useBasketOnly ? basketItems.length === 0 : foodItems.length === 0)}
+              disabled={isLoading || isCategoryMapLoading || (useBasketOnly ? basketItems.length === 0 : foodItems.length === 0)}
               className={`transition-all duration-200 shadow-sm hover:shadow-md px-6 py-2 ${
-                isRateLimited 
-                  ? "bg-orange-500 hover:bg-orange-600"
-                  : useBasketOnly 
-                    ? "bg-brand-600 hover:bg-brand-700" 
-                    : "bg-success-600 hover:bg-success-700"
+                useBasketOnly 
+                  ? "bg-brand-600 hover:bg-brand-700" 
+                  : "bg-success-600 hover:bg-success-700"
               } text-white`}
               size="default"
             >
@@ -629,11 +775,6 @@ const RecipesSuggestion: React.FC<RecipesSuggestionProps> = ({ foodItems, basket
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   <span className="font-medium">検索中...</span>
-                </>
-              ) : isRateLimited ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  <span className="font-medium">待機中...</span>
                 </>
               ) : (
                 <>

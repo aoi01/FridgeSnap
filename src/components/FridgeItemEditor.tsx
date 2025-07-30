@@ -20,7 +20,7 @@ interface FoodItem {
 }
 
 interface FridgeItemEditorProps {
-  item: FoodItem;
+  item?: FoodItem; // itemをオプションにする
   onSave: (updatedItem: FoodItem) => void;
   onCancel: () => void;
 }
@@ -37,7 +37,17 @@ const categories = [
 ];
 
 const FridgeItemEditor: React.FC<FridgeItemEditorProps> = ({ item, onSave, onCancel }) => {
-  const [editedItem, setEditedItem] = useState<FoodItem>({ ...item });
+  // itemが渡されなかった場合は新しいFoodItemを生成
+  const [editedItem, setEditedItem] = useState<FoodItem>(item || {
+    id: crypto.randomUUID(),
+    name: '',
+    category: categories[0], // デフォルトカテゴリ
+    purchaseDate: new Date().toISOString().split('T')[0], // 今日の日付
+    expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7日後
+    quantity: 1,
+    price: 0,
+    isInBasket: false,
+  });
 
   const handleSave = () => {
     onSave(editedItem);
@@ -47,7 +57,7 @@ const FridgeItemEditor: React.FC<FridgeItemEditorProps> = ({ item, onSave, onCan
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <Card className="w-full max-w-md p-6 bg-white">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold">食材を編集</h2>
+          <h2 className="text-xl font-bold">{item ? '食材を編集' : '食材を追加'}</h2>
           <Button variant="ghost" size="sm" onClick={onCancel}>
             <X className="h-4 w-4" />
           </Button>

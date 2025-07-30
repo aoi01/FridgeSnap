@@ -25,7 +25,7 @@ interface ReceiptScannerProps {
 }
 
 // 内部でAPIキーを管理
-const GEMINI_API_KEY = 'AIzaSyAsDOD8jAqhWp3cJWtzkZuG3rtY8TJnzOI'; // 実際のAPIキーに置き換えてください
+const GEMINI_API_KEY = 'AIzaSyCyFXx2gdePHmWqNjw3dE1fhJvN9kDQCw4'; // 実際のAPIキーに置き換えてください
 const RAKUTEN_API_KEY = import.meta.env.VITE_RAKUTEN_API_KEY || 'YOUR_RAKUTEN_API_KEY_HERE';
 const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
   onItemsScanned,

@@ -1,9 +1,10 @@
 
-import React from 'react';
-import { CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CheckCircle, Sparkles, ChefHat } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 import { 
   IoCalendarOutline,
   IoTrashOutline,
@@ -11,7 +12,8 @@ import {
   IoFish,
   IoWater,
   IoSnow,
-  IoExtensionPuzzleOutline
+  IoExtensionPuzzleOutline,
+  IoRestaurant
 } from 'react-icons/io5';
 import { GiCow, GiBread, GiSaltShaker } from 'react-icons/gi';
 
@@ -56,7 +58,7 @@ const TodayBasket: React.FC<TodayBasketProps> = ({ basketItems, onRemoveItem, on
             <IoCalendarOutline className="text-6xl text-neutral-600" />
           </div>
         </div>
-        <h3 className="text-2xl font-semibold text-neutral-900 mb-3">今日の献立バスケットは空です</h3>
+        <h3 className="text-2xl font-semibold text-neutral-900 mb-3">今日の献立に何も選択されていません</h3>
         <p className="text-neutral-600 text-base max-w-md mx-auto">冷蔵庫から食材を選んで今日使う食材を準備しましょう！</p>
       </div>
     );

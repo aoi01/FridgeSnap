@@ -9,7 +9,9 @@
       "Bash(curl:*)",
       "Bash(node:*)",
       "Bash(npx madge:*)",
-      "WebFetch(domain:atlassian.design)"
+      "WebFetch(domain:atlassian.design)",
+      "WebFetch(domain:webservice.rakuten.co.jp)",
+      "Bash(npx tsc:*)"
     ],
     "deny": []
   }

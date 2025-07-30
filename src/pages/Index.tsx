@@ -153,7 +153,7 @@ const Index = () => {
                 <CgSmartHomeRefrigerator  className="h-8 w-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-neutral-900">冷蔵庫管理アプリ</h1>
+                <h1 className="text-3xl font-bold text-neutral-900">Fridge Snap</h1>
                 <p className="text-sm text-neutral-600 font-medium mt-1"></p>
               </div>
             </div>

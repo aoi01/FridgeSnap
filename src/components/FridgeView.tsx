@@ -150,20 +150,6 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
     setEditingItem(null);
   };
 
-  if (foodItems.length === 0) {
-    return (
-      <div className="bg-white border border-neutral-200 rounded-xl p-16 text-center shadow-sm">
-        <div className="flex justify-center mb-6">
-          <div className="p-4 bg-neutral-100 rounded-full">
-            <IoLeaf className="text-6xl text-neutral-600" />
-          </div>
-        </div>
-        <h3 className="text-2xl font-semibold text-neutral-900 mb-3">冷蔵庫が空です</h3>
-        <p className="text-neutral-600 text-base max-w-md mx-auto">レシートをスキャンして食材を追加しましょう！</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* 手動食材追加セクション */}
@@ -339,131 +325,133 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
         )}
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {categories.filter(category => groupedItems[category]?.length > 0).map((category) => {
-          const items = groupedItems[category];
-          const IconComponent = categoryIcons[category as keyof typeof categoryIcons] || IoEgg;
-          return (
-            <Card key={category} className="p-6 bg-white border border-neutral-200 shadow-sm hover:shadow-md transition-shadow duration-200 rounded-xl">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-success-50 rounded-lg">
-                    <IconComponent className="text-xl text-success-600" />
+      {foodItems.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {categories.filter(category => groupedItems[category]?.length > 0).map((category) => {
+            const items = groupedItems[category];
+            const IconComponent = categoryIcons[category as keyof typeof categoryIcons] || IoEgg;
+            return (
+              <Card key={category} className="p-6 bg-white border border-neutral-200 shadow-sm hover:shadow-md transition-shadow duration-200 rounded-xl">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-success-50 rounded-lg">
+                      <IconComponent className="text-xl text-success-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-neutral-900">{category}</h3>
                   </div>
-                  <h3 className="text-lg font-semibold text-neutral-900">{category}</h3>
+                  <Badge className="bg-neutral-100 text-neutral-700 border-0 rounded-md px-2 py-1 text-sm">
+                    {items.length}個
+                  </Badge>
                 </div>
-                <Badge className="bg-neutral-100 text-neutral-700 border-0 rounded-md px-2 py-1 text-sm">
-                  {items.length}個
-                </Badge>
-              </div>
-            
-              <div className="space-y-4">
-                {items.map((item) => {
-                  const expiryStatus = getExpiryStatus(item.expiryDate);
-                  return (
-                    <div
-                      key={item.id}
-                      className="bg-neutral-50 p-4 rounded-lg border border-neutral-200 hover:shadow-sm transition-shadow duration-200"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-neutral-900 text-base mb-1">{item.name}</h4>
-                          <p className="text-sm text-neutral-600 mb-1">数量: {item.quantity}</p>
-                          {item.price > 0 && (
-                            <p className="text-sm font-medium text-success-600">¥{item.price.toLocaleString()}</p>
-                          )}
-                        </div>
-                        
-                        <div className="flex flex-col items-end space-y-2">
-                          <div className="flex items-center space-x-1">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const currentDate = new Date(item.expiryDate);
-                                const minDate = new Date(); // 最低今日まで
-                                
-                                const newDate = new Date(currentDate);
-                                newDate.setDate(newDate.getDate() - 1);
-                                
-                                // 最低今日までの制限をチェック
-                                if (newDate >= minDate) {
+              
+                <div className="space-y-4">
+                  {items.map((item) => {
+                    const expiryStatus = getExpiryStatus(item.expiryDate);
+                    return (
+                      <div
+                        key={item.id}
+                        className="bg-neutral-50 p-4 rounded-lg border border-neutral-200 hover:shadow-sm transition-shadow duration-200"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-neutral-900 text-base mb-1">{item.name}</h4>
+                            <p className="text-sm text-neutral-600 mb-1">数量: {item.quantity}</p>
+                            {item.price > 0 && (
+                              <p className="text-sm font-medium text-success-600">¥{item.price.toLocaleString()}</p>
+                            )}
+                          </div>
+                          
+                          <div className="flex flex-col items-end space-y-2">
+                            <div className="flex items-center space-x-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const currentDate = new Date(item.expiryDate);
+                                  const minDate = new Date(); // 最低今日まで
+                                  
+                                  const newDate = new Date(currentDate);
+                                  newDate.setDate(newDate.getDate() - 1);
+                                  
+                                  // 最低今日までの制限をチェック
+                                  if (newDate >= minDate) {
+                                    const updatedItem = { ...item, expiryDate: newDate.toISOString().split('T')[0] };
+                                    onUpdateItem(updatedItem);
+                                  }
+                                }}
+                                className="h-6 w-6 p-0 text-xs text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700"
+                              >
+                                -
+                              </Button>
+                              <Badge className={`${expiryStatus.color} text-black text-xs px-2 py-1 rounded-md font-medium min-w-[60px] text-center cursor-default`}>
+                                {expiryStatus.text}
+                              </Badge>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const currentDate = new Date(item.expiryDate);
+                                  const newDate = new Date(currentDate);
+                                  newDate.setDate(newDate.getDate() + 1);
                                   const updatedItem = { ...item, expiryDate: newDate.toISOString().split('T')[0] };
                                   onUpdateItem(updatedItem);
-                                }
-                              }}
-                              className="h-6 w-6 p-0 text-xs text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700"
-                            >
-                              -
-                            </Button>
-                            <Badge className={`${expiryStatus.color} text-black text-xs px-2 py-1 rounded-md font-medium min-w-[60px] text-center cursor-default`}>
-                              {expiryStatus.text}
-                            </Badge>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const currentDate = new Date(item.expiryDate);
-                                const newDate = new Date(currentDate);
-                                newDate.setDate(newDate.getDate() + 1);
-                                const updatedItem = { ...item, expiryDate: newDate.toISOString().split('T')[0] };
-                                onUpdateItem(updatedItem);
-                              }}
-                              className="h-6 w-6 p-0 text-xs text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700"
-                            >
-                              +
-                            </Button>
+                                }}
+                                className="h-6 w-6 p-0 text-xs text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700"
+                              >
+                                +
+                              </Button>
+                            </div>
+                            {expiryStatus.status === 'expired' || expiryStatus.status === 'today' ? (
+                              <IoWarningOutline className="h-5 w-5 text-danger-600" />
+                            ) : null}
                           </div>
-                          {expiryStatus.status === 'expired' || expiryStatus.status === 'today' ? (
-                            <IoWarningOutline className="h-5 w-5 text-danger-600" />
-                          ) : null}
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center justify-between pt-3 border-t border-neutral-200">
-                        <div className="text-xs text-neutral-500 flex items-center">
-                          <IoCalendarOutline className="h-3 w-3 mr-1" />
-                          購入: {item.purchaseDate}
                         </div>
                         
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setEditingItem(item)}
-                            className="h-8 px-3 text-xs border-neutral-300 text-neutral-600 hover:bg-neutral-50 transition-colors duration-200"
-                          >
-                            <LuPencil  className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => onMoveToBasket(item)}
-                            className="h-8 px-3 text-xs border-success-300 text-success-600 hover:bg-success-50 transition-colors duration-200"
-                          >
-                            <IoBasket className="h-3 w-3 mr-1" />
-                            献立に
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => onRemoveItem(item.id)}
-                            className="h-8 px-3 text-xs border-danger-300 text-danger-600 hover:bg-danger-50 transition-colors duration-200"
-                          >
-                            <IoTrashOutline className="h-3 w-3" />
-                          </Button>
+                        <div className="flex items-center justify-between pt-3 border-t border-neutral-200">
+                          <div className="text-xs text-neutral-500 flex items-center">
+                            <IoCalendarOutline className="h-3 w-3 mr-1" />
+                            購入: {item.purchaseDate}
+                          </div>
+                          
+                          <div className="flex space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingItem(item)}
+                              className="h-8 px-3 text-xs border-neutral-300 text-neutral-600 hover:bg-neutral-50 transition-colors duration-200"
+                            >
+                              <LuPencil  className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => onMoveToBasket(item)}
+                              className="h-8 px-3 text-xs border-success-300 text-success-600 hover:bg-success-50 transition-colors duration-200"
+                            >
+                              <IoBasket className="h-3 w-3 mr-1" />
+                              献立に
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => onRemoveItem(item.id)}
+                              className="h-8 px-3 text-xs border-danger-300 text-danger-600 hover:bg-danger-50 transition-colors duration-200"
+                            >
+                              <IoTrashOutline className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {editingItem && (
         <FridgeItemEditor
