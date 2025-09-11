@@ -1,4 +1,4 @@
-# Kitchen Sensei Go - プロジェクト概要
+# Fridge Snap - プロジェクト概要
 
 ## プロジェクトについて
 
