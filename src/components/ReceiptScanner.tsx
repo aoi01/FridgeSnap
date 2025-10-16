@@ -24,8 +24,8 @@ interface ReceiptScannerProps {
   onClose: () => void;
 }
 
-// 内部でAPIキーを管理
-const GEMINI_API_KEY = 'AIzaSyCyFXx2gdePHmWqNjw3dE1fhJvN9kDQCw4'; // 実際のAPIキーに置き換えてください
+// 環境変数からAPIキーを取得（セキュリティ向上）
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const RAKUTEN_API_KEY = import.meta.env.VITE_RAKUTEN_API_KEY || 'YOUR_RAKUTEN_API_KEY_HERE';
 const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
   onItemsScanned,
@@ -59,6 +59,14 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
   };
 
   const processReceiptImage = async (file: File) => {
+    if (!GEMINI_API_KEY) {
+      toast.error('Gemini APIキーが設定されていません。.envファイルを確認してください。');
+      return;
+    }
+
+    console.log('API Key available:', GEMINI_API_KEY ? 'Yes' : 'No');
+    console.log('API Key length:', GEMINI_API_KEY?.length || 0);
+    
     setIsLoading(true);
     
     try {
@@ -66,7 +74,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
       const base64 = await fileToBase64(file);
       
       // Call Gemini API to analyze receipt
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -75,28 +83,10 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
           contents: [{
             parts: [
               {
-                text: `このレシートの画像を詳細に分析して、食品・食材のみを特定してください。非食品（洗剤、ティッシュ、薬品など）は完全に除外してください。
+                text: `レシートから食品のみを抽出し、以下のJSONで返してください：
+{"items":[{"name":"商品名","category":"野菜|肉類|魚類|乳製品|調味料|パン・米類|冷凍食品|その他","quantity":1,"price":価格,"estimatedExpiryDays":賞味期限日数}]}
 
-各食品アイテムについて以下の情報をJSONフォーマットで返してください：
-
-{
-  "items": [
-    {
-      "name": "具体的な商品名（日本語、略語ではなく正式な食材名）",
-      "category": "適切なカテゴリ（野菜、肉類、魚類、乳製品、調味料、パン・米類、冷凍食品、その他）",
-      "quantity": 数量または1,
-      "price": 正確な価格,
-      "estimatedExpiryDays": 食材の種類に基づく推定賞味期限日数
-    }
-  ]
-}
-
-重要な指示：
-- 食品・食材のみを抽出し、非食品は完全に無視する
-- 商品名は具体的に（例：「キャベツ」「豚バラ肉」「牛乳」）
-- 賞味期限は食材の特性を考慮して設定（野菜：3-7日、肉類：2-3日、乳製品：5-10日、冷凍食品：30-90日、調味料：180-365日など）
-- 価格は必ず正確に読み取る
-- 不明な場合は合理的な推定値を使用`
+食品以外は無視。価格と商品名は正確に読み取り。賞味期限目安：野菜5日、肉3日、乳製品7日、冷凍食品60日、調味料300日`
               },
               {
                 inline_data: {
@@ -105,12 +95,18 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
                 }
               }
             ]
-          }]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 2048
+          }
         })
       });
 
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
+        const errorText = await response.text();
+        console.error('API Error Response:', errorText);
+        throw new Error(`API request failed: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
@@ -173,8 +169,8 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <Card className={`w-full ${showCamera ? 'max-w-2xl' : 'max-w-md'} p-6 bg-white`}>
-        <div className="flex items-center justify-between mb-6">
+      <Card className={`w-full ${showCamera ? 'max-w-6xl h-[90vh]' : 'max-w-full sm:max-w-md'} p-4 sm:p-6 bg-white border border-neutral-200 shadow-sm rounded-xl`}>
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
           <h2 className="text-xl font-bold">レシートをスキャン</h2>
           <Button variant="ghost" size="sm" onClick={() => { setShowCamera(false); onClose(); }}>
             <X className="h-4 w-4" />
@@ -182,13 +178,13 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
         </div>
 
         {showCamera ? (
-          <div className="space-y-4">
-            <div className="relative bg-black rounded-lg overflow-hidden">
+          <div className="space-y-4 flex flex-col h-full">
+            <div className="relative bg-black rounded-lg overflow-hidden flex-1">
               <Webcam
                 audio={false}
                 ref={webcamRef}
                 screenshotFormat="image/jpeg"
-                className="w-full h-64 object-cover"
+                className="w-full h-full object-cover"
                 videoConstraints={{ facingMode: "environment" }}
               />
               <div className="absolute inset-4 border-2 border-white border-dashed rounded-lg pointer-events-none opacity-50">
@@ -226,14 +222,6 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
               </Button>
             </div>
             
-            <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-              <p className="font-medium mb-1">📸 撮影のコツ：</p>
-              <ul className="text-xs space-y-1">
-                <li>• レシート全体がフレーム内に収まるように</li>
-                <li>• 文字がはっきり読めるように十分に近づく</li>
-                <li>• 光の反射を避けて真っ直ぐ撮影</li>
-              </ul>
-            </div>
           </div>
         ) : (
           <div className="space-y-4">
@@ -241,7 +229,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
               <Button
                 onClick={() => setShowCamera(true)}
                 disabled={isLoading}
-                className="w-full h-20 border-2 border-dashed border-brand-300 hover:border-brand-400 bg-brand-50 hover:bg-brand-100 transition-colors text-brand-700 hover:text-brand-800"
+                className="w-full h-20 border-2 border-dashed border-brand-300 hover:border-brand-400 bg-brand-50 hover:bg-brand-100 transition-all duration-200 text-brand-700 hover:text-brand-800"
                 variant="outline"
               >
                 <div className="flex flex-col items-center space-y-2">
@@ -253,7 +241,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
               <Button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isLoading}
-                className="w-full h-20 border-2 border-dashed border-success-300 hover:border-success-400 bg-success-50 hover:bg-success-100 transition-colors text-success-700 hover:text-success-800"
+                className="w-full h-20 border-2 border-dashed border-success-300 hover:border-success-400 bg-success-50 hover:bg-success-100 transition-all duration-200 text-success-700 hover:text-success-800"
                 variant="outline"
               >
                 {isLoading ? (
@@ -278,15 +266,6 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
               className="hidden"
             />
 
-            <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-              <p className="font-medium mb-1">💡 使い方のコツ：</p>
-              <ul className="text-xs space-y-1">
-                <li>• レシート全体が映るように撮影</li>
-                <li>• 文字がはっきり見えるように</li>
-                <li>• 影や反射を避ける</li>
-                <li>• 食品のみが自動認識されます</li>
-              </ul>
-            </div>
           </div>
         )}
       </Card>

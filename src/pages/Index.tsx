@@ -36,6 +36,8 @@ interface FoodItem {
 
 const Index = () => {
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
+  // 購入履歴専用のステート（削除されずに保持される）
+  const [purchaseHistory, setPurchaseHistory] = useState<FoodItem[]>([]);
   const [showScanner, setShowScanner] = useState(false);
   const [activeTab, setActiveTab] = useState('fridge');
   const [todayBasket, setTodayBasket] = useState<FoodItem[]>([]);
@@ -45,12 +47,18 @@ const Index = () => {
   useEffect(() => {
     const savedItems = localStorage.getItem('fridgeItems');
     const savedBasket = localStorage.getItem('todayBasket');
+    // 購入履歴をLocalStorageから読み込み
+    const savedPurchaseHistory = localStorage.getItem('purchaseHistory');
     
     if (savedItems) {
       setFoodItems(JSON.parse(savedItems));
     }
     if (savedBasket) {
       setTodayBasket(JSON.parse(savedBasket));
+    }
+    // 購入履歴の復元
+    if (savedPurchaseHistory) {
+      setPurchaseHistory(JSON.parse(savedPurchaseHistory));
     }
   }, []);
 
@@ -62,6 +70,11 @@ const Index = () => {
   useEffect(() => {
     localStorage.setItem('todayBasket', JSON.stringify(todayBasket));
   }, [todayBasket]);
+
+  // 購入履歴をLocalStorageに保存
+  useEffect(() => {
+    localStorage.setItem('purchaseHistory', JSON.stringify(purchaseHistory));
+  }, [purchaseHistory]);
 
   // Check for expiring items
   useEffect(() => {
@@ -89,6 +102,8 @@ const Index = () => {
 
   const handleReceiptScanned = (newItems: FoodItem[]) => {
     setFoodItems(prev => [...prev, ...newItems]);
+    // 新しい食材を購入履歴にも追加（永続保存用）
+    setPurchaseHistory(prev => [...prev, ...newItems]);
     setShowScanner(false);
     toast.success(`${newItems.length}つの食材を冷蔵庫に追加しました！`);
   };
@@ -110,17 +125,22 @@ const Index = () => {
   };
 
   const removeFromFridge = (itemId: string) => {
+    // 冷蔵庫から食材を削除（購入履歴は残す）
     setFoodItems(prev => prev.filter(item => item.id !== itemId));
-    toast.success('食材を削除しました');
-  };
+    // 今日の献立にも入っていれば同時に削除
+    setTodayBasket(prev => prev.filter(item => item.id !== itemId));
+    toast.success('食材を削除しました');  
+  };  
 
   const updateFridgeItem = (updatedItem: FoodItem) => {
     setFoodItems(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
-    toast.success('食材を更新しました');
+    console.log('食材を更新しました');
   };
 
   const addFridgeItem = (newItem: FoodItem) => {
     setFoodItems(prev => [...prev, newItem]);
+    // 新しい食材を購入履歴にも追加
+    setPurchaseHistory(prev => [...prev, newItem]);
   };
 
   const getExpiringItems = () => {
@@ -138,8 +158,20 @@ const Index = () => {
     return getExpiringItems().length;
   };
 
+  // 購入履歴の編集機能
+  const updatePurchaseHistory = (updatedItem: FoodItem) => {
+    setPurchaseHistory(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+  };
+
+  // 購入履歴の削除機能
+  const deletePurchaseHistory = (itemId: string) => {
+    setPurchaseHistory(prev => prev.filter(item => item.id !== itemId));
+  };
+
   const handleBulkDeleteExpiring = (itemIds: string[]) => {
     setFoodItems(prev => prev.filter(item => !itemIds.includes(item.id)));
+    // 今日の献立からも該当アイテムを削除
+    setTodayBasket(prev => prev.filter(item => !itemIds.includes(item.id)));
   };
 
   return (
@@ -147,7 +179,7 @@ const Index = () => {
       {/* Header */}
       <div className="bg-white border-b border-neutral-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center space-x-4">
               <div className="bg-brand-600 p-3 rounded-2xl shadow-md">
                 <CgSmartHomeRefrigerator  className="h-8 w-8 text-white" />
@@ -158,14 +190,15 @@ const Index = () => {
               </div>
             </div>
             
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center gap-2 sm:space-x-3">
               {getExpiringCount() > 0 && (
                 <Badge 
-                  className="bg-danger-600 hover:bg-danger-700 text-white border-0 px-4 py-2 shadow-sm cursor-pointer transition-colors duration-200 rounded-lg"
+                  className="bg-danger-600 hover:bg-danger-700 text-white border-0 px-3 sm:px-4 py-2 shadow-sm cursor-pointer transition-colors duration-200 rounded-lg"
                   onClick={() => setShowExpiringModal(true)}
                 >
-                  <IoWarningOutline className="h-4 w-4 mr-2" />
-                  期限切れ間近 {getExpiringCount()}件
+                  <IoWarningOutline className="h-4 w-4 sm:mr-2" />
+                  <span className="sr-only">期限切れ間近 {getExpiringCount()}件</span>
+                  <span className="hidden sm:inline">期限切れ間近 {getExpiringCount()}件</span>
                 </Badge>
               )}
               
@@ -235,11 +268,15 @@ const Index = () => {
         )}
         
         {activeTab === 'recipes' && (
-          <RecipesSuggestion foodItems={foodItems} basketItems={todayBasket} />
+          <RecipesSuggestion basketItems={todayBasket} />
         )}
         
         {activeTab === 'budget' && (
-          <BudgetOverview foodItems={foodItems} />
+          <BudgetOverview 
+            foodItems={purchaseHistory} 
+            onUpdatePurchaseHistory={updatePurchaseHistory}
+            onDeletePurchaseHistory={deletePurchaseHistory}
+          />
         )}
       </div>
 

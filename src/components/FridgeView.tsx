@@ -79,6 +79,7 @@ const categoryIcons = {
 const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRemoveItem, onUpdateItem, onAddItem }) => {
   const [editingItem, setEditingItem] = useState<FoodItem | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [categoryAddForms, setCategoryAddForms] = useState<Record<string, boolean>>({});
   const [newItem, setNewItem] = useState({
     name: '',
     category: '',
@@ -87,6 +88,7 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
     purchaseDate: new Date().toISOString().split('T')[0],
     expiryDate: new Date().toISOString().split('T')[0] // デフォルトで今日の日付
   });
+  const [categoryNewItems, setCategoryNewItems] = useState<Record<string, any>>({});
 
   const getDaysUntilExpiry = (expiryDate: string) => {
     const today = new Date();
@@ -148,6 +150,76 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
   const handleEditSave = (updatedItem: FoodItem) => {
     onUpdateItem(updatedItem);
     setEditingItem(null);
+  };
+
+  const toggleCategoryAddForm = (category: string) => {
+    setCategoryAddForms(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+
+    // フォームを開く時に初期値を設定
+    if (!categoryAddForms[category]) {
+      setCategoryNewItems(prev => ({
+        ...prev,
+        [category]: {
+          name: '',
+          quantity: 1,
+          price: 0,
+          purchaseDate: new Date().toISOString().split('T')[0],
+          expiryDate: new Date().toISOString().split('T')[0]
+        }
+      }));
+    }
+  };
+
+  const updateCategoryNewItem = (category: string, field: string, value: any) => {
+    setCategoryNewItems(prev => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [field]: value
+      }
+    }));
+  };
+
+  const handleCategoryAddItem = (category: string) => {
+    const categoryItem = categoryNewItems[category];
+    if (!categoryItem?.name) {
+      toast.error('食材名を入力してください');
+      return;
+    }
+
+    const foodItem: FoodItem = {
+      id: Date.now().toString(),
+      name: categoryItem.name,
+      category: category,
+      quantity: categoryItem.quantity,
+      price: categoryItem.price,
+      purchaseDate: categoryItem.purchaseDate,
+      expiryDate: categoryItem.expiryDate,
+      isInBasket: false
+    };
+
+    onAddItem(foodItem);
+
+    // フォームをリセット
+    setCategoryNewItems(prev => ({
+      ...prev,
+      [category]: {
+        name: '',
+        quantity: 1,
+        price: 0,
+        purchaseDate: new Date().toISOString().split('T')[0],
+        expiryDate: new Date().toISOString().split('T')[0]
+      }
+    }));
+    setCategoryAddForms(prev => ({
+      ...prev,
+      [category]: false
+    }));
+
+    toast.success(`${categoryItem.name}を${category}に追加しました`);
   };
 
   return (
@@ -334,15 +406,104 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
               <Card key={category} className="p-6 bg-white border border-neutral-200 shadow-sm hover:shadow-md transition-shadow duration-200 rounded-xl">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-success-50 rounded-lg">
-                      <IconComponent className="text-xl text-success-600" />
+                    <div className="p-2 bg-blue-50 rounded-lg">
+                      <IconComponent className="text-xl text-blue-600" />
                     </div>
                     <h3 className="text-lg font-semibold text-neutral-900">{category}</h3>
                   </div>
-                  <Badge className="bg-neutral-100 text-neutral-700 border-0 rounded-md px-2 py-1 text-sm">
-                    {items.length}個
-                  </Badge>
+                  <div className="flex items-center space-x-2">
+                    <Badge className="bg-neutral-100 text-neutral-700 border-0 rounded-md px-2 py-1 text-sm">
+                      {items.length}個
+                    </Badge>
+                    <Button
+                      onClick={() => toggleCategoryAddForm(category)}
+                      variant="outline"
+                      size="sm"
+                      className="border-blue-300 text-blue-600 hover:bg-blue-50 h-8 w-8 p-0"
+                    >
+                      <IoAddOutline className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
+
+                {/* カテゴリ別追加フォーム */}
+                {categoryAddForms[category] && (
+                  <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h4 className="text-sm font-medium text-blue-800 mb-3">{category}の食材を追加</h4>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-blue-700 mb-1">
+                            食材名 <span className="text-danger-600">*</span>
+                          </label>
+                          <Input
+                            type="text"
+                            placeholder={`例: ${category === '野菜' ? 'キャベツ' : category === '肉類' ? '鶏もも肉' : category === '魚類' ? 'サーモン' : '食材名'}`}
+                            value={categoryNewItems[category]?.name || ''}
+                            onChange={(e) => updateCategoryNewItem(category, 'name', e.target.value)}
+                            className="w-full text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-blue-700 mb-1">数量</label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={categoryNewItems[category]?.quantity || 1}
+                            onChange={(e) => updateCategoryNewItem(category, 'quantity', parseInt(e.target.value) || 1)}
+                            className="w-full text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-blue-700 mb-1">価格 (円)</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="10"
+                            placeholder="0"
+                            value={categoryNewItems[category]?.price || ''}
+                            onChange={(e) => updateCategoryNewItem(category, 'price', parseFloat(e.target.value) || 0)}
+                            className="w-full text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-blue-700 mb-1">
+                            賞味期限 <span className="text-danger-600">*</span>
+                          </label>
+                          <Input
+                            type="date"
+                            value={categoryNewItems[category]?.expiryDate || new Date().toISOString().split('T')[0]}
+                            onChange={(e) => updateCategoryNewItem(category, 'expiryDate', e.target.value)}
+                            className="w-full text-sm"
+                            min={new Date().toISOString().split('T')[0]}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end space-x-2 pt-2">
+                        <Button
+                          onClick={() => toggleCategoryAddForm(category)}
+                          variant="outline"
+                          size="sm"
+                          className="border-neutral-300 text-neutral-600 hover:bg-neutral-50 text-xs"
+                        >
+                          キャンセル
+                        </Button>
+                        <Button
+                          onClick={() => handleCategoryAddItem(category)}
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
+                        >
+                          <IoAddOutline className="h-3 w-3 mr-1" />
+                          追加
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               
                 <div className="space-y-4">
                   {items.map((item) => {

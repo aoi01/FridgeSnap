@@ -11,7 +11,16 @@
       "Bash(npx madge:*)",
       "WebFetch(domain:atlassian.design)",
       "WebFetch(domain:webservice.rakuten.co.jp)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "mcp__serena__check_onboarding_performed",
+      "mcp__serena__list_dir",
+      "mcp__serena__activate_project",
+      "mcp__serena__get_symbols_overview",
+      "mcp__serena__find_symbol",
+      "mcp__serena__write_memory",
+      "mcp__serena__search_for_pattern",
+      "Bash(git restore:*)",
+      "WebFetch(domain:ai.google.dev)"
     ],
     "deny": []
   }

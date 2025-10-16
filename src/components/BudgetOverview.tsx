@@ -21,7 +21,9 @@ import {
   IoReceiptOutline,
   IoCalculatorOutline,
   IoCalendarOutline,
-  IoSaveOutline
+  IoSaveOutline,
+  IoCreateOutline,
+  IoTrashOutline
 } from 'react-icons/io5';
 
 interface FoodItem {
@@ -38,6 +40,9 @@ interface FoodItem {
 
 interface BudgetOverviewProps {
   foodItems: FoodItem[];
+  // 購入履歴編集用のコールバック関数
+  onUpdatePurchaseHistory?: (updatedItem: FoodItem) => void;
+  onDeletePurchaseHistory?: (itemId: string) => void;
 }
 
 interface MonthlyData {
@@ -49,9 +54,16 @@ interface MonthlyData {
   engelCoefficient: number;
 }
 
-const BudgetOverview: React.FC<BudgetOverviewProps> = ({ foodItems }) => {
+const BudgetOverview: React.FC<BudgetOverviewProps> = ({ 
+  foodItems, 
+  onUpdatePurchaseHistory, 
+  onDeletePurchaseHistory 
+}) => {
   const [monthlyLivingExpenses, setMonthlyLivingExpenses] = useState<Record<string, number>>({});
   const [currentMonthInput, setCurrentMonthInput] = useState('');
+  // 購入履歴の編集用ステート
+  const [editingItem, setEditingItem] = useState<FoodItem | null>(null);
+  const [editForm, setEditForm] = useState<Partial<FoodItem>>({});
 
   // LocalStorageから生活費データを読み込み
   useEffect(() => {
@@ -141,8 +153,8 @@ const BudgetOverview: React.FC<BudgetOverviewProps> = ({ foodItems }) => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <Card className="p-6 bg-white border border-neutral-200 shadow-sm rounded-xl">
-        <div className="flex items-center justify-between">
+      <Card className="p-4 sm:p-6 bg-white border border-neutral-200 shadow-sm rounded-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center space-x-4">
             <div className="bg-discovery-600 p-3 rounded-2xl shadow-md">
               <IoWalletOutline className="h-8 w-8 text-white" />
@@ -158,8 +170,8 @@ const BudgetOverview: React.FC<BudgetOverviewProps> = ({ foodItems }) => {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* 今月の食費 */}
-        <Card className="p-6 bg-white border border-neutral-200 shadow-sm rounded-xl">
-          <div className="flex items-center justify-between">
+        <Card className="p-4 sm:p-6 bg-white border border-neutral-200 shadow-sm rounded-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
               <p className="text-sm text-neutral-600 mb-2 font-medium">今月の食費</p>
               <p className="text-3xl font-bold text-neutral-900">
@@ -173,8 +185,8 @@ const BudgetOverview: React.FC<BudgetOverviewProps> = ({ foodItems }) => {
         </Card>
 
         {/* 今月の生活費 */}
-        <Card className="p-6 bg-white border border-neutral-200 shadow-sm rounded-xl">
-          <div className="flex items-center justify-between">
+        <Card className="p-4 sm:p-6 bg-white border border-neutral-200 shadow-sm rounded-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
               <p className="text-sm text-neutral-600 mb-2 font-medium">今月の生活費</p>
               <p className="text-3xl font-bold text-neutral-900">
@@ -188,8 +200,8 @@ const BudgetOverview: React.FC<BudgetOverviewProps> = ({ foodItems }) => {
         </Card>
 
         {/* エンゲル係数 */}
-        <Card className="p-6 bg-white border border-neutral-200 shadow-sm rounded-xl">
-          <div className="flex items-center justify-between">
+        <Card className="p-4 sm:p-6 bg-white border border-neutral-200 shadow-sm rounded-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
               <p className="text-sm text-neutral-600 mb-2 font-medium">エンゲル係数</p>
               <p className="text-3xl font-bold text-neutral-900">
@@ -255,7 +267,7 @@ const BudgetOverview: React.FC<BudgetOverviewProps> = ({ foodItems }) => {
         </div>
         
         {budgetData.monthlyData.some(d => d.foodExpense > 0) ? (
-          <div className="h-80">
+          <div className="h-64 sm:h-80">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={budgetData.monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -263,6 +275,9 @@ const BudgetOverview: React.FC<BudgetOverviewProps> = ({ foodItems }) => {
                   dataKey="month" 
                   stroke="#6b7280"
                   fontSize={12}
+                  tickMargin={8}
+                  interval={0}
+                  angle={0}
                 />
                 <YAxis 
                   yAxisId="left"

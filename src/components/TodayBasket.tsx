@@ -10,12 +10,13 @@ import {
   IoTrashOutline,
   IoLeaf,
   IoFish,
-  IoWater,
   IoSnow,
-  IoExtensionPuzzleOutline,
-  IoRestaurant
 } from 'react-icons/io5';
-import { GiCow, GiBread, GiSaltShaker } from 'react-icons/gi';
+import { TbMeat } from 'react-icons/tb';
+import { LuMilk } from 'react-icons/lu';
+import { GiSaltShaker } from 'react-icons/gi';
+import { RiBreadLine } from 'react-icons/ri';
+import { FiAlignJustify } from 'react-icons/fi';
 
 interface FoodItem {
   id: string;
@@ -38,13 +39,24 @@ interface TodayBasketProps {
 
 const categoryIcons = {
   '野菜': IoLeaf,
-  '肉類': GiCow,
+  '肉類': TbMeat,
   '魚類': IoFish,
-  '乳製品': IoWater,  
+  '乳製品': LuMilk,
   '調味料': GiSaltShaker,
-  'パン・米類': GiBread,
+  'パン・米類': RiBreadLine,
   '冷凍食品': IoSnow,
-  'その他': IoExtensionPuzzleOutline
+  'その他': FiAlignJustify
+};
+
+const categoryIconColors = {
+  '野菜': { bg: 'bg-green-50', text: 'text-green-600' },
+  '肉類': { bg: 'bg-green-50', text: 'text-green-700' },
+  '魚類': { bg: 'bg-green-50', text: 'text-green-600' },
+  '乳製品': { bg: 'bg-green-50', text: 'text-green-500' },
+  '調味料': { bg: 'bg-green-50', text: 'text-green-700' },
+  'パン・米類': { bg: 'bg-green-50', text: 'text-green-600' },
+  '冷凍食品': { bg: 'bg-green-50', text: 'text-green-800' },
+  'その他': { bg: 'bg-green-50', text: 'text-green-500' }
 };
 
 const TodayBasket: React.FC<TodayBasketProps> = ({ basketItems, onRemoveItem, onClearBasket, onUpdateItem }) => {
@@ -67,8 +79,8 @@ const TodayBasket: React.FC<TodayBasketProps> = ({ basketItems, onRemoveItem, on
   return (
     <div className="space-y-6">
       {/* Header */}
-      {/* <Card className="p-6 bg-gradient-to-r from-orange-500 to-red-500 text-white">
-        <div className="flex items-center justify-between">
+      {/* <Card className="p-4 sm:p-6 bg-gradient-to-r from-orange-500 to-red-500 text-white">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <h2 className="text-2xl font-bold mb-2">今日の献立バスケット</h2>
             <p className="opacity-90">選択した食材: {basketItems.length}種類</p>
@@ -81,18 +93,19 @@ const TodayBasket: React.FC<TodayBasketProps> = ({ basketItems, onRemoveItem, on
       </Card> */}
 
       {/* Items Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {basketItems.map((item, index) => {
-          const IconComponent = categoryIcons[item.category as keyof typeof categoryIcons] || IoExtensionPuzzleOutline;
+          const IconComponent = categoryIcons[item.category as keyof typeof categoryIcons] || FiAlignJustify;
+          const iconColors = categoryIconColors[item.category as keyof typeof categoryIconColors] || { bg: 'bg-green-50', text: 'text-green-600' };
           return (
-            <Card 
-              key={item.id} 
+            <Card
+              key={item.id}
               className="p-4 bg-white border border-neutral-200 shadow-sm hover:shadow-md transition-shadow duration-200 rounded-xl"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-brand-50 rounded-lg">
-                    <IconComponent className="text-lg text-brand-600" />
+                  <div className={`p-2 ${iconColors.bg} rounded-lg`}>
+                    <IconComponent className={`text-lg ${iconColors.text}`} />
                   </div>
                   <div>
                     <h4 className="font-semibold text-neutral-900 text-base mb-1">{item.name}</h4>

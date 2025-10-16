@@ -55,8 +55,8 @@ const FridgeItemEditor: React.FC<FridgeItemEditorProps> = ({ item, onSave, onCan
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <Card className="w-full max-w-md p-6 bg-white">
-        <div className="flex items-center justify-between mb-6">
+      <Card className="w-full max-w-md p-4 sm:p-6 bg-white">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
           <h2 className="text-xl font-bold">{item ? '食材を編集' : '食材を追加'}</h2>
           <Button variant="ghost" size="sm" onClick={onCancel}>
             <X className="h-4 w-4" />
@@ -147,7 +147,7 @@ const FridgeItemEditor: React.FC<FridgeItemEditorProps> = ({ item, onSave, onCan
                       }
                     }
                   }}
-                  className="px-2 py-1 text-xs border-neutral-300 text-neutral-600 hover:bg-neutral-50"
+                  className="hidden sm:inline-flex px-2 py-1 text-xs border-neutral-300 text-neutral-600 hover:bg-neutral-50"
                 >
                   -1
                 </Button>
@@ -175,7 +175,7 @@ const FridgeItemEditor: React.FC<FridgeItemEditorProps> = ({ item, onSave, onCan
                       setEditedItem(prev => ({ ...prev, expiryDate: today.toISOString().split('T')[0] }));
                     }
                   }}
-                  className="px-2 py-1 text-xs border-neutral-300 text-neutral-600 hover:bg-neutral-50"
+                  className="hidden sm:inline-flex px-2 py-1 text-xs border-neutral-300 text-neutral-600 hover:bg-neutral-50"
                 >
                   +1
                 </Button>
