@@ -1,56 +1,114 @@
+/**
+ * 食材編集・追加モーダルコンポーネント
+ *
+ * このコンポーネントは以下の機能を提供します：
+ * - 既存食材の編集
+ * - 新規食材の追加
+ * - フォームバリデーション
+ * - 賞味期限の簡単調整（±1日ボタン）
+ */
 
 import React, { useState } from 'react';
-import { Save, X, Calendar } from 'lucide-react';
+import { Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
+import { FoodItem } from '@/types/food';
+import { FOOD_CATEGORIES } from '@/constants';
 
-interface FoodItem {
-  id: string;
-  name: string;
-  category: string;
-  purchaseDate: string;
-  expiryDate: string;
-  quantity: number;
-  price: number;
-  isInBasket: boolean;
-  image?: string;
-}
-
+/**
+ * FridgeItemEditor のプロパティ
+ */
 interface FridgeItemEditorProps {
-  item?: FoodItem; // itemをオプションにする
+  /** 編集する食材（未指定の場合は新規追加モード） */
+  item?: FoodItem;
+  /** 保存時のコールバック関数 */
   onSave: (updatedItem: FoodItem) => void;
+  /** キャンセル時のコールバック関数 */
   onCancel: () => void;
 }
 
-const categories = [
-  '野菜',
-  '肉類', 
-  '魚類',
-  '乳製品',
-  '調味料',
-  'パン・米類',
-  '冷凍食品',
-  'その他'
-];
+/**
+ * デフォルトの賞味期限日数（購入日から何日後）
+ */
+const DEFAULT_EXPIRY_DAYS = 7;
 
+/**
+ * 現在の日付を YYYY-MM-DD 形式で取得
+ */
+const getTodayDate = (): string => {
+  return new Date().toISOString().split('T')[0];
+};
+
+/**
+ * 指定日数後の日付を YYYY-MM-DD 形式で取得
+ *
+ * @param days - 日数（正の数で未来、負の数で過去）
+ * @returns YYYY-MM-DD 形式の日付文字列
+ */
+const getDateAfterDays = (days: number): string => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().split('T')[0];
+};
+
+/**
+ * 食材編集・追加モーダルコンポーネント
+ */
 const FridgeItemEditor: React.FC<FridgeItemEditorProps> = ({ item, onSave, onCancel }) => {
-  // itemが渡されなかった場合は新しいFoodItemを生成
-  const [editedItem, setEditedItem] = useState<FoodItem>(item || {
-    id: crypto.randomUUID(),
-    name: '',
-    category: categories[0], // デフォルトカテゴリ
-    purchaseDate: new Date().toISOString().split('T')[0], // 今日の日付
-    expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7日後
-    quantity: 1,
-    price: 0,
-    isInBasket: false,
-  });
+  /**
+   * 編集中の食材データ
+   * itemが渡されなかった場合は新規食材のデフォルト値を使用
+   */
+  const [editedItem, setEditedItem] = useState<FoodItem>(
+    item || {
+      id: crypto.randomUUID(),
+      name: '',
+      category: FOOD_CATEGORIES[0], // デフォルトカテゴリ（野菜）
+      purchaseDate: getTodayDate(), // 今日の日付
+      expiryDate: getDateAfterDays(DEFAULT_EXPIRY_DAYS), // 7日後
+      quantity: 1,
+      price: 0,
+      isInBasket: false,
+    }
+  );
 
-  const handleSave = () => {
+  /**
+   * 保存ボタンクリック時のハンドラー
+   * 編集された食材データを親コンポーネントに通知
+   */
+  const handleSave = (): void => {
     onSave(editedItem);
+  };
+
+  /**
+   * 賞味期限の日付を調整する関数
+   *
+   * @param days - 調整する日数（+1 または -1）
+   */
+  const adjustExpiryDate = (days: number): void => {
+    if (!editedItem.expiryDate) {
+      // 賞味期限が未設定の場合は今日の日付を設定
+      setEditedItem((prev) => ({ ...prev, expiryDate: getTodayDate() }));
+      return;
+    }
+
+    const currentDate = new Date(editedItem.expiryDate);
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() + days);
+
+    // 今日より前の日付には設定できない
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (newDate >= today) {
+      setEditedItem((prev) => ({
+        ...prev,
+        expiryDate: newDate.toISOString().split('T')[0],
+      }));
+    }
   };
 
   return (
@@ -84,7 +142,7 @@ const FridgeItemEditor: React.FC<FridgeItemEditorProps> = ({ item, onSave, onCan
                 <SelectValue placeholder="カテゴリを選択" />
               </SelectTrigger>
               <SelectContent>
-                {categories.map(category => (
+                {FOOD_CATEGORIES.map((category) => (
                   <SelectItem key={category} value={category}>
                     {category}
                   </SelectItem>
@@ -129,53 +187,36 @@ const FridgeItemEditor: React.FC<FridgeItemEditorProps> = ({ item, onSave, onCan
             <div>
               <Label htmlFor="expiryDate">賞味期限</Label>
               <div className="flex items-center space-x-1">
+                {/* 賞味期限を1日減らすボタン */}
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    if (editedItem.expiryDate) {
-                      const currentDate = new Date(editedItem.expiryDate);
-                      const minDate = new Date(); // 最低今日まで
-                      
-                      const newDate = new Date(currentDate);
-                      newDate.setDate(newDate.getDate() - 1);
-                      
-                      // 最低今日までの制限をチェック
-                      if (newDate >= minDate) {
-                        setEditedItem(prev => ({ ...prev, expiryDate: newDate.toISOString().split('T')[0] }));
-                      }
-                    }
-                  }}
+                  onClick={() => adjustExpiryDate(-1)}
                   className="hidden sm:inline-flex px-2 py-1 text-xs border-neutral-300 text-neutral-600 hover:bg-neutral-50"
+                  aria-label="賞味期限を1日減らす"
                 >
                   -1
                 </Button>
+                {/* 賞味期限入力フィールド */}
                 <Input
                   id="expiryDate"
                   type="date"
                   value={editedItem.expiryDate}
-                  onChange={(e) => setEditedItem(prev => ({ ...prev, expiryDate: e.target.value }))}
+                  onChange={(e) =>
+                    setEditedItem((prev) => ({ ...prev, expiryDate: e.target.value }))
+                  }
                   className="flex-1"
-                  min={new Date().toISOString().split('T')[0]} // 最低今日まで
+                  min={getTodayDate()} // 今日以降のみ選択可能
                 />
+                {/* 賞味期限を1日増やすボタン */}
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    if (editedItem.expiryDate) {
-                      const currentDate = new Date(editedItem.expiryDate);
-                      const newDate = new Date(currentDate);
-                      newDate.setDate(newDate.getDate() + 1);
-                      setEditedItem(prev => ({ ...prev, expiryDate: newDate.toISOString().split('T')[0] }));
-                    } else {
-                      // 初期値として今日の日付を設定
-                      const today = new Date();
-                      setEditedItem(prev => ({ ...prev, expiryDate: today.toISOString().split('T')[0] }));
-                    }
-                  }}
+                  onClick={() => adjustExpiryDate(1)}
                   className="hidden sm:inline-flex px-2 py-1 text-xs border-neutral-300 text-neutral-600 hover:bg-neutral-50"
+                  aria-label="賞味期限を1日増やす"
                 >
                   +1
                 </Button>

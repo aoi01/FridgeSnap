@@ -20,7 +20,11 @@
       "mcp__serena__write_memory",
       "mcp__serena__search_for_pattern",
       "Bash(git restore:*)",
-      "WebFetch(domain:ai.google.dev)"
+      "WebFetch(domain:ai.google.dev)",
+      "Bash(git commit:*)",
+      "Bash(git add:*)",
+      "Bash(npm test:*)",
+      "Bash(npx vitest run)"
     ],
     "deny": []
   }
