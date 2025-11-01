@@ -9,9 +9,9 @@
 
 import { ComponentType } from 'react';
 import { IoLeaf, IoFish, IoSnow } from 'react-icons/io5';
-import { TbMeat } from 'react-icons/tb';
+import { TbMeat, TbBowlSpoon } from 'react-icons/tb';
 import { LuMilk } from 'react-icons/lu';
-import { GiSaltShaker, GiNoodles, GiWheat } from 'react-icons/gi';
+import { GiSaltShaker } from 'react-icons/gi';
 import { RiBreadLine } from 'react-icons/ri';
 import { FiAlignJustify } from 'react-icons/fi';
 import { FoodCategory } from '@/constants';
@@ -27,7 +27,7 @@ export const CATEGORY_ICONS: Record<FoodCategory, ComponentType<{ className?: st
   '乳製品': LuMilk,
   '調味料': GiSaltShaker,
   'パン': RiBreadLine,
-  '麺類': GiWheat,
+  '麺類': TbBowlSpoon,
   '冷凍食品': IoSnow,
   'その他': FiAlignJustify,
 };
