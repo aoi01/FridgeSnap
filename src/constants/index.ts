@@ -18,7 +18,8 @@ export const FOOD_CATEGORIES = [
   '魚類',
   '乳製品',
   '調味料',
-  'パン・米類',
+  'パン',
+  '麺類',
   '冷凍食品',
   'その他',
 ] as const;
@@ -139,3 +140,19 @@ export const EXPIRY_STATUS_CONFIG = {
  * 有効期限ステータスの型
  */
 export type ExpiryStatusType = keyof typeof EXPIRY_STATUS_CONFIG;
+
+/**
+ * カテゴリごとのデフォルト賞味期限日数
+ * AIが賞味期限を推定できなかった場合のフォールバック値として使用
+ */
+export const DEFAULT_EXPIRY_DAYS_BY_CATEGORY: Record<FoodCategory, number> = {
+  '野菜': 5,
+  '肉類': 3,
+  '魚類': 2,
+  '乳製品': 7,
+  '調味料': 365,
+  'パン': 5,
+  '麺類': 7,
+  '冷凍食品': 60,
+  'その他': 7,
+} as const;

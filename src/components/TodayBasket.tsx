@@ -1,54 +1,45 @@
+/**
+ * 今日の献立コンポーネント
+ *
+ * このコンポーネントは以下の機能を提供します：
+ * - 今日使用する食材の一覧表示
+ * - 食材の削除
+ * - 合計金額の表示
+ * - 献立のクリア
+ */
 
-import React, { useState, useEffect } from 'react';
-import { CheckCircle, Sparkles, ChefHat } from 'lucide-react';
+import React from 'react';
+import { Sparkles, ChefHat, CheckCircle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { 
-  IoCalendarOutline,
-  IoTrashOutline,
-  IoLeaf,
-  IoFish,
-  IoSnow,
-} from 'react-icons/io5';
-import { TbMeat } from 'react-icons/tb';
-import { LuMilk } from 'react-icons/lu';
-import { GiSaltShaker } from 'react-icons/gi';
-import { RiBreadLine } from 'react-icons/ri';
-import { FiAlignJustify } from 'react-icons/fi';
+import { IoCalendarOutline, IoTrashOutline } from 'react-icons/io5';
 
-interface FoodItem {
-  id: string;
-  name: string;
-  category: string;
-  purchaseDate: string;
-  expiryDate: string;
-  quantity: number;
-  price: number;
-  isInBasket: boolean;
-  image?: string;
-}
+// 型定義とユーティリティのインポート
+import { FoodItem } from '@/types/food';
+import { CATEGORY_ICONS } from '@/utils/categoryUtils';
+import { calculateDaysUntilExpiry } from '@/utils/foodUtils';
 
+/**
+ * TodayBasket コンポーネントのプロパティ
+ */
 interface TodayBasketProps {
+  /** 今日の献立に追加された食材リスト */
   basketItems: FoodItem[];
+  /** 食材を削除する関数 */
   onRemoveItem: (itemId: string) => void;
+  /** 献立を全てクリアする関数 */
   onClearBasket: () => void;
+  /** 食材を更新する関数 */
   onUpdateItem: (updatedItem: FoodItem) => void;
 }
 
-const categoryIcons = {
-  '野菜': IoLeaf,
-  '肉類': TbMeat,
-  '魚類': IoFish,
-  '乳製品': LuMilk,
-  '調味料': GiSaltShaker,
-  'パン・米類': RiBreadLine,
-  '冷凍食品': IoSnow,
-  'その他': FiAlignJustify
-};
-
-const categoryIconColors = {
+/**
+ * カテゴリごとのアイコン表示色
+ * 献立ビューでは統一的な緑色系を使用
+ */
+const categoryIconColors: Record<string, { bg: string; text: string }> = {
   '野菜': { bg: 'bg-green-50', text: 'text-green-600' },
   '肉類': { bg: 'bg-green-50', text: 'text-green-700' },
   '魚類': { bg: 'bg-green-50', text: 'text-green-600' },
@@ -92,11 +83,12 @@ const TodayBasket: React.FC<TodayBasketProps> = ({ basketItems, onRemoveItem, on
         </div>
       </Card> */}
 
-      {/* Items Grid */}
+      {/* 食材アイテムのグリッド表示 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {basketItems.map((item, index) => {
-          const IconComponent = categoryIcons[item.category as keyof typeof categoryIcons] || FiAlignJustify;
-          const iconColors = categoryIconColors[item.category as keyof typeof categoryIconColors] || { bg: 'bg-green-50', text: 'text-green-600' };
+        {basketItems.map((item) => {
+          // カテゴリに対応するアイコンと色を取得
+          const IconComponent = CATEGORY_ICONS[item.category];
+          const iconColors = categoryIconColors[item.category] || { bg: 'bg-green-50', text: 'text-green-600' };
           return (
             <Card
               key={item.id}

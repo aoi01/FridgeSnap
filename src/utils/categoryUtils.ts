@@ -11,7 +11,7 @@ import { ComponentType } from 'react';
 import { IoLeaf, IoFish, IoSnow } from 'react-icons/io5';
 import { TbMeat } from 'react-icons/tb';
 import { LuMilk } from 'react-icons/lu';
-import { GiSaltShaker } from 'react-icons/gi';
+import { GiSaltShaker, GiNoodles, GiWheat } from 'react-icons/gi';
 import { RiBreadLine } from 'react-icons/ri';
 import { FiAlignJustify } from 'react-icons/fi';
 import { FoodCategory } from '@/constants';
@@ -26,7 +26,8 @@ export const CATEGORY_ICONS: Record<FoodCategory, ComponentType<{ className?: st
   '魚類': IoFish,
   '乳製品': LuMilk,
   '調味料': GiSaltShaker,
-  'パン・米類': RiBreadLine,
+  'パン': RiBreadLine,
+  '麺類': GiWheat,
   '冷凍食品': IoSnow,
   'その他': FiAlignJustify,
 };
@@ -51,7 +52,8 @@ export const CATEGORY_COLORS: Record<FoodCategory, CategoryColors> = {
   '魚類': { bg: 'bg-blue-50', text: 'text-blue-600' },
   '乳製品': { bg: 'bg-yellow-50', text: 'text-yellow-600' },
   '調味料': { bg: 'bg-purple-50', text: 'text-purple-600' },
-  'パン・米類': { bg: 'bg-orange-50', text: 'text-orange-600' },
+  'パン': { bg: 'bg-orange-50', text: 'text-orange-600' },
+  '麺類': { bg: 'bg-amber-50', text: 'text-amber-600' },
   '冷凍食品': { bg: 'bg-cyan-50', text: 'text-cyan-600' },
   'その他': { bg: 'bg-gray-50', text: 'text-gray-600' },
 };

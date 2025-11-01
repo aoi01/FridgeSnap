@@ -1,6 +1,14 @@
+/**
+ * 冷蔵庫ビューコンポーネント
+ *
+ * このコンポーネントは以下の機能を提供します：
+ * - カテゴリ別の食材表示
+ * - 食材の追加・編集・削除
+ * - 今日の献立への追加
+ * - 有効期限の視覚的表示
+ */
 
 import React, { useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,53 +16,42 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import FridgeItemEditor from '@/components/FridgeItemEditor';
-import { LuMilk } from "react-icons/lu";
-import { LuPencil } from "react-icons/lu";
-
-import { 
-  IoCalendarOutline, 
-  IoBasket, 
-  IoTrashOutline, 
-  IoPencilOutline,
-  IoWarningOutline,
-  IoLeaf,
-  IoFish,
-  IoRestaurant,
-  IoWater,
-  IoNutritionOutline,
-  IoEgg,
-  IoSnow,
-  IoExtensionPuzzleOutline,
+import {
+  IoCalendarOutline,
+  IoBasket,
+  IoTrashOutline,
   IoAddOutline,
   IoAddCircleOutline,
 } from 'react-icons/io5';
-import { TbMeat } from "react-icons/tb";
-import { GiCow, GiBread, GiSaltShaker } from 'react-icons/gi';
-import { RiBreadLine } from "react-icons/ri";
-import { FiAlignJustify } from "react-icons/fi";
+import { LuPencil } from 'react-icons/lu';
 
+// 型定義とユーティリティのインポート
+import { FoodItem } from '@/types/food';
+import { FOOD_CATEGORIES } from '@/constants';
+import { CATEGORY_ICONS, getCategoryIcon } from '@/utils/categoryUtils';
+import { calculateDaysUntilExpiry } from '@/utils/foodUtils';
 
-interface FoodItem {
-  id: string;
-  name: string;
-  category: string;
-  purchaseDate: string;
-  expiryDate: string;
-  quantity: number;
-  price: number;
-  isInBasket: boolean;
-  image?: string;
-}
-
+/**
+ * FridgeView コンポーネントのプロパティ
+ */
 interface FridgeViewProps {
+  /** 表示する食材リスト */
   foodItems: FoodItem[];
+  /** 食材を今日の献立に追加する関数 */
   onMoveToBasket: (item: FoodItem) => void;
+  /** 食材を削除する関数 */
   onRemoveItem: (itemId: string) => void;
+  /** 食材を更新する関数 */
   onUpdateItem: (updatedItem: FoodItem) => void;
+  /** 新しい食材を追加する関数 */
   onAddItem: (item: FoodItem) => void;
 }
 
-const categoryColors = {
+/**
+ * カテゴリごとのTailwind CSSクラス
+ * 背景色とテキスト色のセット
+ */
+const categoryColors: Record<string, string> = {
   '野菜': 'bg-green-100 text-green-800',
   '肉類': 'bg-red-100 text-red-800',
   '魚類': 'bg-blue-100 text-blue-800',
@@ -65,45 +62,51 @@ const categoryColors = {
   'その他': 'bg-gray-100 text-gray-800'
 };
 
-const categoryIcons = {
-  '野菜': IoLeaf,
-  '肉類': TbMeat,
-  '魚類': IoFish,
-  '乳製品': LuMilk,  
-  '調味料': GiSaltShaker,
-  'パン・米類': RiBreadLine,
-  '冷凍食品': IoSnow,
-  'その他': FiAlignJustify
-};
-
 const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRemoveItem, onUpdateItem, onAddItem }) => {
   const [editingItem, setEditingItem] = useState<FoodItem | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [categoryAddForms, setCategoryAddForms] = useState<Record<string, boolean>>({});
+  /**
+   * 新規食材追加フォームの状態
+   * 初期値としてカテゴリは最初の要素（野菜）を設定
+   */
   const [newItem, setNewItem] = useState({
     name: '',
-    category: '',
+    category: FOOD_CATEGORIES[0], // デフォルトは「野菜」
     quantity: 1,
     price: 0,
     purchaseDate: new Date().toISOString().split('T')[0],
-    expiryDate: new Date().toISOString().split('T')[0] // デフォルトで今日の日付
+    expiryDate: new Date().toISOString().split('T')[0]
   });
-  const [categoryNewItems, setCategoryNewItems] = useState<Record<string, any>>({});
+  /**
+   * カテゴリごとの新規追加フォームの状態
+   * 各カテゴリに対して個別の入力フォームを管理
+   */
+  const [categoryNewItems, setCategoryNewItems] = useState<Record<string, {
+    name: string;
+    category: string;
+    quantity: number;
+    price: number;
+    purchaseDate: string;
+    expiryDate: string;
+  }>>({});
 
-  const getDaysUntilExpiry = (expiryDate: string) => {
-    const today = new Date();
-    const expiry = new Date(expiryDate);
-    const diffTime = expiry.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
+  /**
+   * 有効期限のステータスを取得する
+   * foodUtils.tsの関数を使用し、UIに適したフォーマットで返す
+   */
   const getExpiryStatus = (expiryDate: string) => {
-    const days = getDaysUntilExpiry(expiryDate);
+    const days = calculateDaysUntilExpiry(expiryDate);
+
+    // 期限切れ
     if (days < 0) return { status: 'expired', color: 'bg-red-500', text: '期限切れ' };
+    // 本日期限
     if (days === 0) return { status: 'today', color: 'bg-red-400', text: '今日まで' };
+    // 明日期限
     if (days === 1) return { status: 'tomorrow', color: 'bg-orange-400', text: '明日まで' };
+    // 数日以内
     if (days <= 3) return { status: 'soon', color: 'bg-yellow-400', text: `${days}日後` };
+    // 安全
     return { status: 'safe', color: 'bg-green-400', text: `${days}日後` };
   };
 
@@ -127,18 +130,20 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
     onAddItem(foodItem);
     setNewItem({
       name: '',
-      category: '',
+      category: FOOD_CATEGORIES[0], // デフォルトに戻す
       quantity: 1,
       price: 0,
       purchaseDate: new Date().toISOString().split('T')[0],
-      expiryDate: new Date().toISOString().split('T')[0] // デフォルトで今日の日付
+      expiryDate: new Date().toISOString().split('T')[0]
     });
     setShowAddForm(false);
     toast.success(`${newItem.name}を冷蔵庫に追加しました`);
   };
 
-  const categories = ['野菜', '肉類', '魚類', '乳製品', '調味料', 'パン・米類', '冷凍食品', 'その他'];
-
+  /**
+   * 食材をカテゴリ別にグループ化
+   * FOOD_CATEGORIESの順序を保つためにreduceを使用
+   */
   const groupedItems = foodItems.reduce((acc, item) => {
     if (!acc[item.category]) {
       acc[item.category] = [];
@@ -164,6 +169,7 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
         ...prev,
         [category]: {
           name: '',
+          category: category,
           quantity: 1,
           price: 0,
           purchaseDate: new Date().toISOString().split('T')[0],
@@ -208,6 +214,7 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
       ...prev,
       [category]: {
         name: '',
+        category: category,
         quantity: 1,
         price: 0,
         purchaseDate: new Date().toISOString().split('T')[0],
@@ -269,14 +276,17 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
                     <SelectValue placeholder="カテゴリを選択" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map(category => (
-                      <SelectItem key={category} value={category}>
-                        <div className="flex items-center space-x-2">
-                          {React.createElement(categoryIcons[category as keyof typeof categoryIcons] || IoEgg, { className: "h-4 w-4" })}
-                          <span>{category}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {FOOD_CATEGORIES.map(category => {
+                      const IconComponent = CATEGORY_ICONS[category];
+                      return (
+                        <SelectItem key={category} value={category}>
+                          <div className="flex items-center space-x-2">
+                            <IconComponent className="h-4 w-4" />
+                            <span>{category}</span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -397,11 +407,12 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
         )}
       </Card>
 
+      {/* カテゴリ別食材表示 */}
       {foodItems.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {categories.filter(category => groupedItems[category]?.length > 0).map((category) => {
+          {FOOD_CATEGORIES.filter(category => groupedItems[category]?.length > 0).map((category) => {
             const items = groupedItems[category];
-            const IconComponent = categoryIcons[category as keyof typeof categoryIcons] || IoEgg;
+            const IconComponent = CATEGORY_ICONS[category];
             return (
               <Card key={category} className="p-6 bg-white border border-neutral-200 shadow-sm hover:shadow-md transition-shadow duration-200 rounded-xl">
                 <div className="flex items-center justify-between mb-6">
