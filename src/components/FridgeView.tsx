@@ -16,18 +16,21 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import FridgeItemEditor from '@/components/FridgeItemEditor';
+import StorageTipsModal from '@/components/StorageTipsModal';
 import {
   IoCalendarOutline,
   IoBasket,
   IoTrashOutline,
   IoAddOutline,
   IoAddCircleOutline,
+  IoWarningOutline,
 } from 'react-icons/io5';
 import { LuPencil } from 'react-icons/lu';
+import { Lightbulb } from 'lucide-react';
 
 // 型定義とユーティリティのインポート
 import { FoodItem } from '@/types/food';
-import { FOOD_CATEGORIES } from '@/constants';
+import { FOOD_CATEGORIES, STORAGE_TIPS } from '@/constants';
 import { CATEGORY_ICONS, getCategoryIcon } from '@/utils/categoryUtils';
 import { calculateDaysUntilExpiry } from '@/utils/foodUtils';
 
@@ -66,6 +69,8 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
   const [editingItem, setEditingItem] = useState<FoodItem | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [categoryAddForms, setCategoryAddForms] = useState<Record<string, boolean>>({});
+  const [showTipsModal, setShowTipsModal] = useState(false);
+  const [selectedItemForTips, setSelectedItemForTips] = useState<FoodItem | null>(null);
   /**
    * 新規食材追加フォームの状態
    * 初期値としてカテゴリは最初の要素（野菜）を設定
@@ -99,15 +104,84 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
     const days = calculateDaysUntilExpiry(expiryDate);
 
     // 期限切れ
-    if (days < 0) return { status: 'expired', color: 'bg-red-500', text: '期限切れ' };
+    if (days < 0) return {
+      status: 'expired',
+      badgeColor: 'bg-red-500',
+      cardBg: 'bg-red-100',
+      cardBorder: 'border-red-300',
+      text: '期限切れ'
+    };
     // 本日期限
-    if (days === 0) return { status: 'today', color: 'bg-red-400', text: '今日まで' };
+    if (days === 0) return {
+      status: 'today',
+      badgeColor: 'bg-red-400',
+      cardBg: 'bg-red-100',
+      cardBorder: 'border-red-300',
+      text: '今日まで'
+    };
     // 明日期限
-    if (days === 1) return { status: 'tomorrow', color: 'bg-orange-400', text: '明日まで' };
+    if (days === 1) return {
+      status: 'tomorrow',
+      badgeColor: 'bg-orange-400',
+      cardBg: 'bg-orange-100',
+      cardBorder: 'border-orange-300',
+      text: '明日まで'
+    };
     // 数日以内
-    if (days <= 3) return { status: 'soon', color: 'bg-yellow-400', text: `${days}日後` };
+    if (days <= 3) return {
+      status: 'soon',
+      badgeColor: 'bg-yellow-400',
+      cardBg: 'bg-yellow-100',
+      cardBorder: 'border-yellow-300',
+      text: `${days}日後`
+    };
     // 安全
-    return { status: 'safe', color: 'bg-green-400', text: `${days}日後` };
+    return {
+      status: 'safe',
+      badgeColor: 'bg-green-400',
+      cardBg: 'bg-green-100',
+      cardBorder: 'border-green-300',
+      text: `${days}日後`
+    };
+  };
+
+  /**
+   * 保存Tipsを適用して賞味期限を延長する
+   */
+  const handleExtendExpiry = (itemId: string, days: number, tipTitle: string) => {
+    const item = foodItems.find(i => i.id === itemId);
+    if (!item) return;
+
+    // 既に適用済みのTipsかチェック
+    if (item.appliedStorageTips?.includes(tipTitle)) {
+      toast.warning('このTipsは既に適用済みです');
+      return;
+    }
+
+    const currentExpiry = new Date(item.expiryDate);
+    const newExpiry = new Date(currentExpiry);
+    newExpiry.setDate(newExpiry.getDate() + days);
+
+    const updatedItem = {
+      ...item,
+      expiryDate: newExpiry.toISOString().split('T')[0],
+      appliedStorageTips: [...(item.appliedStorageTips || []), tipTitle]
+    };
+
+    onUpdateItem(updatedItem);
+  };
+
+  /**
+   * 保存Tipsモーダルを開く
+   */
+  const openTipsModal = (item: FoodItem) => {
+    const tips = STORAGE_TIPS[item.category];
+    if (!tips || tips.length === 0) {
+      toast.info('このカテゴリの保存Tipsは現在準備中です');
+      return;
+    }
+    setSelectedItemForTips(item);
+    setShowTipsModal(true);
   };
 
   const handleAddItem = () => {
@@ -522,7 +596,7 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
                     return (
                       <div
                         key={item.id}
-                        className="bg-neutral-50 p-4 rounded-lg border border-neutral-200 hover:shadow-sm transition-shadow duration-200"
+                        className={`${expiryStatus.cardBg} p-4 rounded-lg border ${expiryStatus.cardBorder} hover:shadow-md transition-all duration-200`}
                       >
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1">
@@ -542,10 +616,10 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
                                 onClick={() => {
                                   const currentDate = new Date(item.expiryDate);
                                   const minDate = new Date(); // 最低今日まで
-                                  
+
                                   const newDate = new Date(currentDate);
                                   newDate.setDate(newDate.getDate() - 1);
-                                  
+
                                   // 最低今日までの制限をチェック
                                   if (newDate >= minDate) {
                                     const updatedItem = { ...item, expiryDate: newDate.toISOString().split('T')[0] };
@@ -556,7 +630,7 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
                               >
                                 -
                               </Button>
-                              <Badge className={`${expiryStatus.color} text-black text-xs px-2 py-1 rounded-md font-medium min-w-[60px] text-center cursor-default`}>
+                              <Badge className={`${expiryStatus.badgeColor} text-black text-xs px-2 py-1 rounded-md font-medium min-w-[60px] text-center cursor-default pointer-events-none`}>
                                 {expiryStatus.text}
                               </Badge>
                               <Button
@@ -575,6 +649,18 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
                                 +
                               </Button>
                             </div>
+                            {STORAGE_TIPS[item.category] && STORAGE_TIPS[item.category].length > 0 && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openTipsModal(item)}
+                                className="h-7 px-2 text-xs border-brand-300 text-brand-600 hover:bg-brand-50 flex items-center gap-1"
+                              >
+                                <Lightbulb className="h-3 w-3" />
+                                <span>保存ヒント</span>
+                              </Button>
+                            )}
                             {expiryStatus.status === 'expired' || expiryStatus.status === 'today' ? (
                               <IoWarningOutline className="h-5 w-5 text-danger-600" />
                             ) : null}
@@ -632,6 +718,16 @@ const FridgeView: React.FC<FridgeViewProps> = ({ foodItems, onMoveToBasket, onRe
           onCancel={() => setEditingItem(null)}
         />
       )}
+
+      <StorageTipsModal
+        isOpen={showTipsModal}
+        onClose={() => {
+          setShowTipsModal(false);
+          setSelectedItemForTips(null);
+        }}
+        item={selectedItemForTips}
+        onExtendExpiry={handleExtendExpiry}
+      />
     </div>
   );
 };

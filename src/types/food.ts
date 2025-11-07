@@ -23,6 +23,7 @@ import { FoodCategory } from '@/constants';
  * @property price - 価格（円）
  * @property isInBasket - 今日の献立に追加されているかどうか
  * @property image - 食材画像のURL（オプション）
+ * @property appliedStorageTips - 適用済みの保存Tipsのタイトルリスト（オプション）
  */
 export interface FoodItem {
   id: string;
@@ -34,6 +35,7 @@ export interface FoodItem {
   price: number;
   isInBasket: boolean;
   image?: string;
+  appliedStorageTips?: string[];
 }
 
 /**

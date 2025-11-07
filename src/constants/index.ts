@@ -151,8 +151,88 @@ export const DEFAULT_EXPIRY_DAYS_BY_CATEGORY: Record<FoodCategory, number> = {
   '魚類': 2,
   '乳製品': 7,
   '調味料': 365,
-  'パン': 5,
-  '麺類': 7,
+  'パン': 3,
+  '麺類': 180,
   '冷凍食品': 60,
   'その他': 7,
 } as const;
+
+/**
+ * 保存方法のTips
+ * 各カテゴリごとに消費期限を延ばすための保存方法を定義
+ */
+export interface StorageTip {
+  /** Tipsのタイトル */
+  title: string;
+  /** Tipsの説明 */
+  description: string;
+  /** 延長される日数 */
+  extendDays: number;
+}
+
+export const STORAGE_TIPS: Record<FoodCategory, StorageTip[]> = {
+  '野菜': [
+    {
+      title: 'キッチンペーパーで包む',
+      description: '湿らせたキッチンペーパーで包み、ビニール袋に入れて冷蔵庫の野菜室で保存すると鮮度が保たれます',
+      extendDays: 7
+    },
+    {
+      title: '冷凍保存',
+      description: '使いやすい大きさにカットして冷凍保存すると長期保存が可能です',
+      extendDays: 30
+    },
+    {
+      title: '塩もみ保存',
+      description: '塩もみして水分を抜いてから保存すると日持ちします',
+      extendDays: 5
+    }
+  ],
+  '肉類': [
+    {
+      title: '冷凍保存',
+      description: '小分けにしてラップで包み、密閉袋に入れて冷凍保存すると長期保存が可能です',
+      extendDays: 30
+    },
+    {
+      title: '下味をつけて冷凍',
+      description: '調味料で下味をつけてから冷凍すると、調理も楽で保存期間も延びます',
+      extendDays: 21
+    },
+    {
+      title: '真空パック保存',
+      description: '真空パックにして冷蔵保存すると酸化を防ぎ、鮮度が長持ちします',
+      extendDays: 3
+    }
+  ],
+  '魚類': [
+    {
+      title: '冷凍保存',
+      description: 'ラップで包み、密閉袋に入れて冷凍保存すると長期保存が可能です',
+      extendDays: 21
+    },
+    {
+      title: '塩漬け保存',
+      description: '塩をまぶして冷蔵保存すると日持ちします',
+      extendDays: 3
+    }
+  ],
+  '乳製品': [
+    {
+      title: '冷凍保存',
+      description: 'チーズやバターは冷凍保存で長期保存が可能です',
+      extendDays: 30
+    }
+  ],
+  '調味料': [],
+  'パン': [
+    {
+      title: '冷凍保存',
+      description: 'スライスして1枚ずつラップで包み、冷凍保存すると長期保存が可能です',
+      extendDays: 30
+    }
+  ],
+  '麺類': [],
+  '冷凍食品': [],
+  'その他': []
+};
