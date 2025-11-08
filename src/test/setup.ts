@@ -118,6 +118,7 @@ vi.mock('import.meta', () => ({
 
 // 🎭 外部ライブラリのモック
 vi.mock('sonner', () => ({
+  Toaster: () => React.createElement('div', { 'data-testid': 'sonner-toaster' }),
   toast: {
     success: vi.fn(),
     error: vi.fn(),
