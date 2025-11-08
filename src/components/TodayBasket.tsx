@@ -1,26 +1,15 @@
 /**
  * 今日の献立コンポーネント
  *
- * このコンポーネントは以下の機能を提供します：
- * - 今日使用する食材の一覧表示
- * - 食材の削除
- * - 合計金額の表示
- * - 献立のクリア
+ * 今日使用する食材の一覧表示と献立管理機能を提供
+ * アイテム表示はBasketItemCardコンポーネントに委譲
  */
 
 import React from 'react';
-import { Sparkles, ChefHat, CheckCircle } from 'lucide-react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import { IoCalendarOutline, IoTrashOutline } from 'react-icons/io5';
-
-// 型定義とユーティリティのインポート
+import { IoCalendarOutline } from 'react-icons/io5';
 import { FoodItem } from '@/types/food';
-import { CATEGORY_ICONS } from '@/utils/categoryUtils';
-import { calculateDaysUntilExpiry } from '@/utils/food/expiryUtils';
-import { adjustDateWithMinimum } from '@/utils/dateUtils';
+import BasketItemCard from './basket/BasketItemCard';
+import BasketActionSection from './basket/BasketActionSection';
 
 /**
  * TodayBasket コンポーネントのプロパティ
@@ -36,24 +25,8 @@ interface TodayBasketProps {
   onUpdateItem: (updatedItem: FoodItem) => void;
 }
 
-/**
- * カテゴリごとのアイコン表示色
- * 献立ビューでは統一的な緑色系を使用
- */
-const categoryIconColors: Record<string, { bg: string; text: string }> = {
-  '野菜': { bg: 'bg-green-50', text: 'text-green-600' },
-  '肉類': { bg: 'bg-green-50', text: 'text-green-700' },
-  '魚類': { bg: 'bg-green-50', text: 'text-green-600' },
-  '乳製品': { bg: 'bg-green-50', text: 'text-green-500' },
-  '調味料': { bg: 'bg-green-50', text: 'text-green-700' },
-  'パン・米類': { bg: 'bg-green-50', text: 'text-green-600' },
-  '冷凍食品': { bg: 'bg-green-50', text: 'text-green-800' },
-  'その他': { bg: 'bg-green-50', text: 'text-green-500' }
-};
-
 const TodayBasket: React.FC<TodayBasketProps> = ({ basketItems, onRemoveItem, onClearBasket, onUpdateItem }) => {
-  const totalPrice = basketItems.reduce((sum, item) => sum + item.price, 0);
-
+  // 空状態
   if (basketItems.length === 0) {
     return (
       <div className="bg-white border border-neutral-200 rounded-xl p-16 text-center shadow-sm">
@@ -68,131 +41,26 @@ const TodayBasket: React.FC<TodayBasketProps> = ({ basketItems, onRemoveItem, on
     );
   }
 
+  // 通常表示
   return (
     <div className="space-y-6">
-      {/* Header */}
-      {/* <Card className="p-4 sm:p-6 bg-gradient-to-r from-orange-500 to-red-500 text-white">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div>
-            <h2 className="text-2xl font-bold mb-2">今日の献立バスケット</h2>
-            <p className="opacity-90">選択した食材: {basketItems.length}種類</p>
-            {totalPrice > 0 && (
-              <p className="opacity-90">合計価格: ¥{totalPrice.toLocaleString()}</p>
-            )}
-          </div>
-          <div className="text-4xl">🧺</div>
-        </div>
-      </Card> */}
-
-      {/* 食材アイテムのグリッド表示 */}
+      {/* アイテムグリッド */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {basketItems.map((item) => {
-          // カテゴリに対応するアイコンと色を取得
-          const IconComponent = CATEGORY_ICONS[item.category];
-          const iconColors = categoryIconColors[item.category] || { bg: 'bg-green-50', text: 'text-green-600' };
-          return (
-            <Card
-              key={item.id}
-              className="p-4 bg-white border border-neutral-200 shadow-sm hover:shadow-md transition-shadow duration-200 rounded-xl"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center space-x-3">
-                  <div className={`p-2 ${iconColors.bg} rounded-lg`}>
-                    <IconComponent className={`text-lg ${iconColors.text}`} />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-neutral-900 text-base mb-1">{item.name}</h4>
-                    <Badge className="bg-neutral-100 text-neutral-700 border-0 rounded-md px-2 py-1 text-xs">
-                      {item.category}
-                    </Badge>
-                  </div>
-                </div>
-                
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => onRemoveItem(item.id)}
-                  className="text-neutral-400 hover:text-danger-600 hover:bg-danger-50 transition-colors duration-200 p-1"
-                >
-                  <IoTrashOutline className="h-4 w-4" />
-                </Button>
-              </div>
-            
-              <div className="space-y-2 text-sm text-neutral-600">
-                <div className="flex justify-between items-center">
-                  <span>数量:</span>
-                  <span className="font-medium text-neutral-900">{item.quantity}</span>
-                </div>
-                {item.price > 0 && (
-                  <div className="flex justify-between items-center">
-                    <span>価格:</span>
-                    <span className="font-medium text-success-600">¥{item.price.toLocaleString()}</span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-neutral-200">
-                  <span className="flex items-center">
-                    <IoCalendarOutline className="h-3 w-3 mr-1" />
-                    期限:
-                  </span>
-                  <div className="flex items-center space-x-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const newExpiryDate = adjustDateWithMinimum(item.expiryDate, -1);
-                        onUpdateItem({ ...item, expiryDate: newExpiryDate });
-                      }}
-                      className="h-5 w-5 p-0 text-xs text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600"
-                    >
-                      -
-                    </Button>
-                    <span className="text-black font-medium min-w-[70px] text-center text-xs cursor-default">
-                      {item.expiryDate}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const newExpiryDate = adjustDateWithMinimum(item.expiryDate, 1);
-                        onUpdateItem({ ...item, expiryDate: newExpiryDate });
-                      }}
-                      className="h-5 w-5 p-0 text-xs text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600"
-                    >
-                      +
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          );
-        })}
+        {basketItems.map((item) => (
+          <BasketItemCard
+            key={item.id}
+            item={item}
+            onRemoveItem={onRemoveItem}
+            onUpdateItem={onUpdateItem}
+          />
+        ))}
       </div>
 
-      {/* Action Buttons */}
-      <Card className="p-6 bg-success-50 border border-success-200 rounded-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold text-success-800 mb-1 text-lg">調理完了</h3>
-            <p className="text-sm text-success-700">
-              料理が完了したら、使用した食材をまとめて削除できます
-            </p>
-          </div>
-          
-          <Button
-            onClick={onClearBasket}
-            className="bg-success-600 hover:bg-success-700 text-white flex items-center space-x-2 px-4 py-2 shadow-sm hover:shadow-md transition-all duration-200"
-            disabled={basketItems.length === 0}
-            size="default"
-          >
-            <CheckCircle className="h-4 w-4" />
-            <span className="font-medium">調理完了・一括削除</span>
-          </Button>
-        </div>
-      </Card>
-
-      
+      {/* アクションセクション */}
+      <BasketActionSection
+        itemCount={basketItems.length}
+        onClearBasket={onClearBasket}
+      />
     </div>
   );
 };
