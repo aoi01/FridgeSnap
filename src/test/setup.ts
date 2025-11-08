@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom'
 import { cleanup } from '@testing-library/react'
 import { afterEach, beforeAll, afterAll, vi } from 'vitest'
+import React from 'react'
 import { mockServer } from './mocks/server'
 
 // 🗑️ 各テスト後のクリーンアップ
@@ -127,38 +128,37 @@ vi.mock('sonner', () => ({
 
 // 📊 Recharts のモック（チャートテスト用）
 vi.mock('recharts', () => ({
-  LineChart: ({ children }: any) => <div data-testid="line-chart">{children}</div>,
-  Line: () => <div data-testid="line" />,
-  XAxis: () => <div data-testid="x-axis" />,
-  YAxis: () => <div data-testid="y-axis" />,
-  CartesianGrid: () => <div data-testid="cartesian-grid" />,
-  Tooltip: () => <div data-testid="tooltip" />,
-  ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
-  ReferenceLine: () => <div data-testid="reference-line" />,
-  Legend: () => <div data-testid="legend" />
+  LineChart: ({ children }: any) => React.createElement('div', { 'data-testid': 'line-chart' }, children),
+  Line: () => React.createElement('div', { 'data-testid': 'line' }),
+  XAxis: () => React.createElement('div', { 'data-testid': 'x-axis' }),
+  YAxis: () => React.createElement('div', { 'data-testid': 'y-axis' }),
+  CartesianGrid: () => React.createElement('div', { 'data-testid': 'cartesian-grid' }),
+  Tooltip: () => React.createElement('div', { 'data-testid': 'tooltip' }),
+  ResponsiveContainer: ({ children }: any) => React.createElement('div', { 'data-testid': 'responsive-container' }, children),
+  ReferenceLine: () => React.createElement('div', { 'data-testid': 'reference-line' }),
+  Legend: () => React.createElement('div', { 'data-testid': 'legend' })
 }))
 
 // 📸 React Webcam のモック
 vi.mock('react-webcam', () => ({
   default: vi.fn(({ onUserMedia, onUserMediaError }) => {
     // モックのWebcamコンポーネント
-    return (
-      <div 
-        data-testid="mock-webcam"
-        onClick={() => onUserMedia && onUserMedia()}
-      >
-        Mock Webcam
-      </div>
+    return React.createElement(
+      'div',
+      {
+        'data-testid': 'mock-webcam',
+        onClick: () => onUserMedia && onUserMedia()
+      },
+      'Mock Webcam'
     )
   })
 }))
 
 // 🎨 Lucide React アイコンのモック
 vi.mock('lucide-react', () => {
-  const MockIcon = ({ 'data-testid': testId, ...props }: any) => (
-    <div data-testid={testId || 'mock-icon'} {...props} />
-  )
-  
+  const MockIcon = ({ 'data-testid': testId, ...props }: any) =>
+    React.createElement('div', { 'data-testid': testId || 'mock-icon', ...props })
+
   return {
     Save: MockIcon,
     X: MockIcon,
@@ -174,6 +174,8 @@ vi.mock('lucide-react', () => {
     Search: MockIcon,
     Snow: MockIcon,
     Create: MockIcon,
-    Trash: MockIcon
+    Trash: MockIcon,
+    Lightbulb: MockIcon,
+    CheckCircle: MockIcon
   }
 })
