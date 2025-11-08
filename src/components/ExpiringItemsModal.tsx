@@ -41,7 +41,6 @@ interface ExpiringItemsModalProps {
 
 /**
  * カテゴリごとのアイコン表示色
- * 警告モーダルでは統一的な赤色系を使用
  */
 const categoryIconColors: Record<string, { bg: string; text: string }> = {
   '野菜': { bg: 'bg-red-50', text: 'text-red-600' },

@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card } from '@/components/ui/card';
 import { FoodItem } from '@/types/food';
 import { FOOD_CATEGORIES } from '@/constants';
+import { getTodayDate, getDateAfterDays } from '@/utils/dateUtils';
 
 /**
  * FridgeItemEditor のプロパティ
@@ -34,25 +35,6 @@ interface FridgeItemEditorProps {
  * デフォルトの賞味期限日数（購入日から何日後）
  */
 const DEFAULT_EXPIRY_DAYS = 7;
-
-/**
- * 現在の日付を YYYY-MM-DD 形式で取得
- */
-const getTodayDate = (): string => {
-  return new Date().toISOString().split('T')[0];
-};
-
-/**
- * 指定日数後の日付を YYYY-MM-DD 形式で取得
- *
- * @param days - 日数（正の数で未来、負の数で過去）
- * @returns YYYY-MM-DD 形式の日付文字列
- */
-const getDateAfterDays = (days: number): string => {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date.toISOString().split('T')[0];
-};
 
 /**
  * 食材編集・追加モーダルコンポーネント

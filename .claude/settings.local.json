@@ -24,7 +24,12 @@
       "Bash(git commit:*)",
       "Bash(git add:*)",
       "Bash(npm test:*)",
-      "Bash(npx vitest run)"
+      "Bash(npx vitest run)",
+      "Bash(if [ -f \"c:/Users/aoi/Fridge snap/App.css\" ])",
+      "Bash(then echo \"Found App.css\")",
+      "Bash(else echo \"App.css not found\")",
+      "Bash(fi)",
+      "Bash(powershell -Command:*)"
     ],
     "deny": []
   }

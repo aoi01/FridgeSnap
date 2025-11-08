@@ -19,7 +19,7 @@ import { IoCalendarOutline, IoTrashOutline } from 'react-icons/io5';
 // 型定義とユーティリティのインポート
 import { FoodItem } from '@/types/food';
 import { CATEGORY_ICONS } from '@/utils/categoryUtils';
-import { calculateDaysUntilExpiry } from '@/utils/foodUtils';
+import { calculateDaysUntilExpiry } from '@/utils/food/expiryUtils';
 
 /**
  * TodayBasket コンポーネントのプロパティ

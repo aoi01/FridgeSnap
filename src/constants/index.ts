@@ -6,6 +6,7 @@
  * - STORAGE_KEYS: localStorageのキー
  * - UI_CONFIG: UIに関する設定値
  * - API_CONFIG: API関連の設定値
+ * - CATEGORY_COLORS: カテゴリ別のTailwind CSSカラー定義
  */
 
 /**
@@ -236,3 +237,19 @@ export const STORAGE_TIPS: Record<FoodCategory, StorageTip[]> = {
   '冷凍食品': [],
   'その他': []
 };
+
+/**
+ * カテゴリごとのTailwind CSSカラー定義
+ * 背景色とテキスト色のセットで管理
+ */
+export const CATEGORY_COLORS: Record<FoodCategory, string> = {
+  '野菜': 'bg-green-100 text-green-800',
+  '肉類': 'bg-red-100 text-red-800',
+  '魚類': 'bg-blue-100 text-blue-800',
+  '乳製品': 'bg-yellow-100 text-yellow-800',
+  '調味料': 'bg-purple-100 text-purple-800',
+  'パン': 'bg-orange-100 text-orange-800',
+  '麺類': 'bg-cyan-100 text-cyan-800',
+  '冷凍食品': 'bg-cyan-100 text-cyan-800',
+  'その他': 'bg-gray-100 text-gray-800'
+} as const;
