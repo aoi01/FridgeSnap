@@ -19,7 +19,7 @@ import { AlertTriangle, Calendar, ShoppingBasket, Trash2, X, HelpCircle } from '
 // 型定義とユーティリティのインポート
 import { FoodItem } from '@/types/food';
 import { CATEGORY_ICONS } from '@/utils/categoryUtils';
-import { calculateDaysUntilExpiry } from '@/utils/foodUtils';
+import { getExpiryStatusUI } from '@/hooks/useExpiryStatus';
 
 /**
  * ExpiringItemsModal コンポーネントのプロパティ
@@ -62,24 +62,6 @@ const ExpiringItemsModal: React.FC<ExpiringItemsModalProps> = ({
   onRemoveItem,
   onBulkDelete
 }) => {
-  /**
-   * 有効期限のステータスを取得する
-   * foodUtils.tsの関数を使用し、UIに適したフォーマットで返す
-   */
-  const getExpiryStatus = (expiryDate: string) => {
-    const days = calculateDaysUntilExpiry(expiryDate);
-
-    // 期限切れ
-    if (days < 0) return { status: 'expired', color: 'bg-red-500', text: '期限切れ' };
-    // 本日期限
-    if (days === 0) return { status: 'today', color: 'bg-red-400', text: '今日まで' };
-    // 明日期限
-    if (days === 1) return { status: 'tomorrow', color: 'bg-orange-400', text: '明日まで' };
-    // 数日以内
-    if (days <= 3) return { status: 'soon', color: 'bg-yellow-400', text: `${days}日後` };
-    // 安全
-    return { status: 'safe', color: 'bg-green-400', text: `${days}日後` };
-  };
 
   const handleMoveToBasket = (item: FoodItem) => {
     onMoveToBasket(item);
@@ -128,7 +110,7 @@ const ExpiringItemsModal: React.FC<ExpiringItemsModalProps> = ({
             </div>
           ) : (
             expiringItems.map((item) => {
-              const expiryStatus = getExpiryStatus(item.expiryDate);
+              const expiryStatus = getExpiryStatusUI(item.expiryDate);
               // カテゴリに対応するアイコンと色を取得
               const IconComponent = CATEGORY_ICONS[item.category] || HelpCircle;
               const iconColors = categoryIconColors[item.category] || { bg: 'bg-red-50', text: 'text-red-600' };
@@ -145,7 +127,7 @@ const ExpiringItemsModal: React.FC<ExpiringItemsModalProps> = ({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start flex-col sm:flex-row sm:items-center gap-2 mb-2">
                           <h4 className="font-semibold text-neutral-900 text-base">{item.name}</h4>
-                          <Badge className={`${expiryStatus.color} text-black text-xs px-2 py-1 rounded-md font-medium hover:${expiryStatus.color} pointer-events-none flex-shrink-0`}>
+                          <Badge className={`${expiryStatus.badgeColor} text-black text-xs px-2 py-1 rounded-md font-medium hover:${expiryStatus.badgeColor} pointer-events-none flex-shrink-0`}>
                             {expiryStatus.text}
                           </Badge>
                         </div>

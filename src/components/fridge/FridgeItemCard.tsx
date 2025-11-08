@@ -18,6 +18,7 @@ import { Lightbulb } from 'lucide-react';
 import { FoodItem } from '@/types/food';
 import { STORAGE_TIPS } from '@/constants';
 import { getExpiryStatusUI } from '@/hooks/useExpiryStatus';
+import { adjustDateWithMinimum } from '@/utils/dateUtils';
 
 interface FridgeItemCardProps {
   item: FoodItem;
@@ -39,18 +40,11 @@ export const FridgeItemCard: React.FC<FridgeItemCardProps> = ({
   const expiryStatus = getExpiryStatusUI(item.expiryDate);
 
   const handleAdjustExpiry = (days: number) => {
-    const currentDate = new Date(item.expiryDate);
-    const minDate = new Date();
-
-    const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + days);
-
-    if (newDate >= minDate || days > 0) {
-      onUpdateExpiry({
-        ...item,
-        expiryDate: newDate.toISOString().split('T')[0],
-      });
-    }
+    const newExpiryDate = adjustDateWithMinimum(item.expiryDate, days);
+    onUpdateExpiry({
+      ...item,
+      expiryDate: newExpiryDate,
+    });
   };
 
   return (

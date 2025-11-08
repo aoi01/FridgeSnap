@@ -19,21 +19,8 @@ import {
   IoWalletOutline,
   IoSnowOutline
 } from 'react-icons/io5';
-import { MdKitchen } from 'react-icons/md';
 import { CgSmartHomeRefrigerator } from "react-icons/cg";
 import { useFridgeState } from '@/hooks/useFridgeState';
-
-interface FoodItem {
-  id: string;
-  name: string;
-  category: string;
-  purchaseDate: string;
-  expiryDate: string;
-  quantity: number;
-  price: number;
-  isInBasket: boolean;
-  image?: string;
-}
 
 const Index = () => {
   const [showScanner, setShowScanner] = useState(false);

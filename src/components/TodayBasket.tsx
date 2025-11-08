@@ -20,6 +20,7 @@ import { IoCalendarOutline, IoTrashOutline } from 'react-icons/io5';
 import { FoodItem } from '@/types/food';
 import { CATEGORY_ICONS } from '@/utils/categoryUtils';
 import { calculateDaysUntilExpiry } from '@/utils/food/expiryUtils';
+import { adjustDateWithMinimum } from '@/utils/dateUtils';
 
 /**
  * TodayBasket コンポーネントのプロパティ
@@ -139,17 +140,8 @@ const TodayBasket: React.FC<TodayBasketProps> = ({ basketItems, onRemoveItem, on
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        const currentDate = new Date(item.expiryDate);
-                        const minDate = new Date(); // 最低今日まで
-                        
-                        const newDate = new Date(currentDate);
-                        newDate.setDate(newDate.getDate() - 1);
-                        
-                        // 最低今日までの制限をチェック
-                        if (newDate >= minDate) {
-                          const updatedItem = { ...item, expiryDate: newDate.toISOString().split('T')[0] };
-                          onUpdateItem(updatedItem);
-                        }
+                        const newExpiryDate = adjustDateWithMinimum(item.expiryDate, -1);
+                        onUpdateItem({ ...item, expiryDate: newExpiryDate });
                       }}
                       className="h-5 w-5 p-0 text-xs text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600"
                     >
@@ -163,11 +155,8 @@ const TodayBasket: React.FC<TodayBasketProps> = ({ basketItems, onRemoveItem, on
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        const currentDate = new Date(item.expiryDate);
-                        const newDate = new Date(currentDate);
-                        newDate.setDate(newDate.getDate() + 1);
-                        const updatedItem = { ...item, expiryDate: newDate.toISOString().split('T')[0] };
-                        onUpdateItem(updatedItem);
+                        const newExpiryDate = adjustDateWithMinimum(item.expiryDate, 1);
+                        onUpdateItem({ ...item, expiryDate: newExpiryDate });
                       }}
                       className="h-5 w-5 p-0 text-xs text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600"
                     >

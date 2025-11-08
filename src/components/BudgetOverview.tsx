@@ -15,7 +15,7 @@ import {
   ReferenceLine,
   Legend
 } from 'recharts';
-import { 
+import {
   IoWalletOutline,
   IoTrendingUpOutline,
   IoReceiptOutline,
@@ -25,33 +25,13 @@ import {
   IoCreateOutline,
   IoTrashOutline
 } from 'react-icons/io5';
-
-interface FoodItem {
-  id: string;
-  name: string;
-  category: string;
-  purchaseDate: string;
-  expiryDate: string;
-  quantity: number;
-  price: number;
-  isInBasket: boolean;
-  image?: string;
-}
+import { FoodItem, MonthlyData } from '@/types/food';
 
 interface BudgetOverviewProps {
   foodItems: FoodItem[];
   // 購入履歴編集用のコールバック関数
   onUpdatePurchaseHistory?: (updatedItem: FoodItem) => void;
   onDeletePurchaseHistory?: (itemId: string) => void;
-}
-
-interface MonthlyData {
-  month: string;
-  year: number;
-  monthNumber: number;
-  foodExpense: number;
-  livingExpense: number;
-  engelCoefficient: number;
 }
 
 const BudgetOverview: React.FC<BudgetOverviewProps> = ({ 

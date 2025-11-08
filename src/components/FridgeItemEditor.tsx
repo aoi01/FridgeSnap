@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card } from '@/components/ui/card';
 import { FoodItem } from '@/types/food';
 import { FOOD_CATEGORIES } from '@/constants';
-import { getTodayDate, getDateAfterDays } from '@/utils/dateUtils';
+import { getTodayDate, getDateAfterDays, adjustDateWithMinimum } from '@/utils/dateUtils';
 
 /**
  * FridgeItemEditor のプロパティ
@@ -67,30 +67,17 @@ const FridgeItemEditor: React.FC<FridgeItemEditorProps> = ({ item, onSave, onCan
 
   /**
    * 賞味期限の日付を調整する関数
+   * adjustDateWithMinimum ユーティリティを使用して一元管理
    *
    * @param days - 調整する日数（+1 または -1）
    */
   const adjustExpiryDate = (days: number): void => {
-    if (!editedItem.expiryDate) {
-      // 賞味期限が未設定の場合は今日の日付を設定
-      setEditedItem((prev) => ({ ...prev, expiryDate: getTodayDate() }));
-      return;
-    }
-
-    const currentDate = new Date(editedItem.expiryDate);
-    const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + days);
-
-    // 今日より前の日付には設定できない
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (newDate >= today) {
-      setEditedItem((prev) => ({
-        ...prev,
-        expiryDate: newDate.toISOString().split('T')[0],
-      }));
-    }
+    const currentExpiry = editedItem.expiryDate || getTodayDate();
+    const newExpiryDate = adjustDateWithMinimum(currentExpiry, days);
+    setEditedItem((prev) => ({
+      ...prev,
+      expiryDate: newExpiryDate,
+    }));
   };
 
   return (
