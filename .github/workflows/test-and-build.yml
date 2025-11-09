@@ -1,0 +1,360 @@
+# ================================================================================
+# 🚀 CI/CD パイプライン: テストとビルドの自動実行
+# ================================================================================
+# このワークフローは、以下の処理を自動的に実行します：
+# 1. コードの静的解析（ESLint）
+# 2. ユニットテストの実行（Vitest）
+# 3. テストカバレッジの計測と報告
+# 4. プロダクションビルドの検証
+# 5. エンドツーエンドテストの実行（準備中）
+#
+# 実行タイミング：
+# - メインブランチへのプッシュ時
+# - プルリクエスト作成時
+# - 手動トリガー（Actions → Run workflow）
+# ================================================================================
+
+name: CI/CD Pipeline
+
+# ================================================================================
+# 🎯 トリガー設定
+# ================================================================================
+# ワークフローが実行される条件を定義します
+on:
+  # プッシュイベント時に実行（メインブランチのみ）
+  push:
+    branches:
+      - main
+
+  # プルリクエスト時に実行
+  pull_request:
+    branches:
+      - main
+
+  # 手動トリガー（GitHub UI から実行可能）
+  workflow_dispatch:
+
+# ================================================================================
+# ⚙️ グローバル設定
+# ================================================================================
+env:
+  # Node.jsバージョン指定
+  NODE_VERSION: '20.x'
+  # キャッシュキー用のタイムスタンプ
+  CACHE_VERSION: 1
+
+jobs:
+  # ================================================================================
+  # 📋 ESLint - コードの静的解析
+  # ================================================================================
+  # 目的：
+  # - コードスタイルの一貫性を検査
+  # - 潜在的なバグを検出
+  # - 不要な変数やインポートを検出
+  #
+  # 実行内容：
+  # - 全 TypeScript/JavaScript ファイルをスキャン
+  # - ESLint設定ファイル（.eslintrc）のルールに従って検査
+  # - エラーと警告を出力
+  # ================================================================================
+  lint:
+    name: 📋 ESLint チェック
+    runs-on: ubuntu-latest
+
+    steps:
+      # ステップ1: リポジトリをチェックアウト
+      # 理由：ローカルマシンの代わりに、GitHub Actions のワーカーに
+      #       リポジトリのコードをコピーして、そこで検査を実行する必要があります
+      - name: 📥 リポジトリをチェックアウト
+        uses: actions/checkout@v4
+        with:
+          # 完全な履歴を取得（差分検査が必要な場合）
+          fetch-depth: 0
+
+      # ステップ2: Node.js環境をセットアップ
+      # 理由：npm コマンドを実行するために、Node.js がインストールされた
+      #       環境が必要です
+      - name: 🔧 Node.js をセットアップ
+        uses: actions/setup-node@v4
+        with:
+          # 指定したバージョンの Node.js をインストール
+          node-version: ${{ env.NODE_VERSION }}
+          # パッケージキャッシュを設定（高速化）
+          cache: 'npm'
+
+      # ステップ3: 依存パッケージをインストール
+      # 理由：package.json で指定されたすべてのパッケージをダウンロード
+      #       して、プロジェクトが依存するライブラリを準備
+      - name: 📦 依存パッケージをインストール
+        run: npm install --legacy-peer-deps
+        timeout-minutes: 10
+
+      # ステップ4: ESLint を実行して静的解析
+      # 理由：コードの品質を検査して、スタイル違反やバグの可能性を
+      #       検出します。結果が JSON 形式で出力されます
+      - name: 🔍 ESLint を実行
+        run: npm run lint
+        # 失敗時でも続行して、後続のジョブも実行させる（オプション）
+        continue-on-error: false
+
+  # ================================================================================
+  # 🧪 ユニットテスト - Vitest によるテスト実行
+  # ================================================================================
+  # 目的：
+  # - 各コンポーネントとユーティリティの動作確認
+  # - リグレッション（機能の低下）検出
+  # - テストカバレッジの計測
+  #
+  # 実行内容：
+  # - Vitest ですべてのテストを実行
+  # - テストカバレッジを計測
+  # - 結果を JSON 形式で出力
+  # - カバレッジレポートを生成
+  # ================================================================================
+  test:
+    name: 🧪 ユニットテスト
+    runs-on: ubuntu-latest
+    # lint ジョブの完了後に実行（並列実行可能にするため）
+    needs: lint
+
+    steps:
+      - name: 📥 リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: 🔧 Node.js をセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 依存パッケージをインストール
+        run: npm install --legacy-peer-deps
+        timeout-minutes: 10
+
+      # テスト実行：カバレッジ計測付き
+      # 理由：--coverage フラグでカバレッジ情報を収集します
+      #       --reporter=json で JSON 形式の詳細結果を出力
+      - name: 🧪 テストを実行（カバレッジ計測）
+        run: npm run test:coverage -- --run --reporter=json --outputFile=coverage/test-results.json
+        timeout-minutes: 15
+
+      # テスト結果が失敗した場合のみ、詳細レポートを出力
+      - name: 📊 テスト結果サマリーを表示
+        if: always()
+        run: |
+          if [ -f "coverage/test-results.json" ]; then
+            echo "✅ テスト結果："
+            cat coverage/test-results.json | jq '.stats // .'
+          fi
+
+      # カバレッジレポートの生成（HTML形式）
+      # 理由：HTML 形式のレポートを生成することで、GitHub Pages や
+      #       Actions の artifact として結果を視覚的に確認できます
+      - name: 📈 カバレッジレポートを生成
+        if: always()
+        run: npm run test:coverage:report -- --run
+        continue-on-error: true
+
+      # 生成したレポートをアップロード（後で確認可能）
+      - name: 📤 カバレッジレポートをアップロード
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          # アーティファクトの識別名
+          name: coverage-report
+          # アップロードするディレクトリ
+          path: coverage/
+          # 30日間保持
+          retention-days: 30
+
+      # Codecov へカバレッジデータを送信（オプション）
+      # 理由：外部のカバレッジ追跡サービス（Codecov）に結果を送信
+      #       することで、カバレッジの推移を可視化できます
+      - name: 📊 Codecov にカバレッジを送信
+        uses: codecov/codecov-action@v3
+        with:
+          # アップロードするカバレッジファイル
+          files: ./coverage/coverage-final.json
+          # codecov.io に通知
+          fail_ci_if_error: false
+          # 詳細なログ出力
+          verbose: true
+        continue-on-error: true
+
+  # ================================================================================
+  # 🔨 ビルド検証 - プロダクション用ビルドの確認
+  # ================================================================================
+  # 目的：
+  # - プロダクション用ビルドが正常に完了することを確認
+  # - バンドルサイズを計測
+  # - ビルドエラーを早期に検出
+  #
+  # 実行内容：
+  # - TypeScript のコンパイルチェック（型エラー検査）
+  # - Vite によるプロダクションビルド実行
+  # - 成果物のファイルサイズを確認
+  # ================================================================================
+  build:
+    name: 🔨 ビルド検証
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - name: 📥 リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: 🔧 Node.js をセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 依存パッケージをインストール
+        run: npm install --legacy-peer-deps
+        timeout-minutes: 10
+
+      # TypeScript コンパイルチェック
+      # 理由：型エラーがあると JavaScript にコンパイルできないため、
+      #       事前に検査して問題を検出
+      - name: ✅ TypeScript コンパイルチェック
+        run: npx tsc --noEmit
+        continue-on-error: false
+
+      # プロダクション用ビルド実行
+      # 理由：実際にアプリケーションをビルドして、ビルドプロセス自体が
+      #       成功することを確認。エラーは即座に検出されます
+      - name: 🔨 Vite でビルド
+        run: npm run build
+        timeout-minutes: 15
+        env:
+          # プロダクション環境としてビルド
+          NODE_ENV: production
+
+      # ビルド成果物の確認
+      # 理由：dist ディレクトリが生成され、必要なファイルが含まれて
+      #       いることを確認します
+      - name: 📦 ビルド成果物を確認
+        run: |
+          echo "✅ ビルド成果物:"
+          ls -lh dist/
+          echo "📊 ディレクトリサイズ:"
+          du -sh dist/
+
+      # ビルド成果物をアップロード（デプロイ用）
+      # 理由：後続のデプロイプロセス、または手動でのチェックのために
+      #       成果物を保存します
+      - name: 📤 ビルド成果物をアップロード
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-artifact
+          path: dist/
+          retention-days: 7
+
+  # ================================================================================
+  # 🌐 E2E テスト - Playwright によるエンドツーエンドテスト
+  # ================================================================================
+  # 目的：
+  # - ユーザーシナリオの実際の動作確認
+  # - ブラウザ互換性の検証
+  # - UI/UX の統合テスト
+  #
+  # 注意：
+  # - このジョブは現在プレースホルダー（準備中）です
+  # - 実装後は build ジョブの完了後に実行されます
+  # - 複数ブラウザでのテストが可能
+  # ================================================================================
+  e2e:
+    name: 🌐 E2E テスト
+    runs-on: ubuntu-latest
+    needs: build
+    # 一時的に無効化（テストが準備できたら有効化）
+    if: false
+
+    strategy:
+      # 複数のブラウザで並列実行
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - name: 📥 リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: 🔧 Node.js をセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 依存パッケージをインストール
+        run: npm install --legacy-peer-deps
+        timeout-minutes: 10
+
+      # Playwright ブラウザのインストール
+      # 理由：E2E テストを実行するために、Playwright が制御するブラウザが必要です
+      - name: 🌐 Playwright ブラウザをインストール
+        run: npx playwright install --with-deps
+        timeout-minutes: 15
+
+      # ビルド成果物をダウンロード
+      - name: 📥 ビルド成果物をダウンロード
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-artifact
+          path: dist/
+
+      # E2E テスト実行
+      - name: 🧪 E2E テストを実行
+        run: npm run test:e2e -- --project=${{ matrix.browser }}
+        timeout-minutes: 20
+
+      # テスト失敗時のスクリーンショット・ビデオをアップロード
+      - name: 📤 テスト失敗時のアーティファクトをアップロード
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: playwright-report/
+          retention-days: 7
+
+  # ================================================================================
+  # 📊 結果サマリー - すべてのジョブの統合結果
+  # ================================================================================
+  # 目的：
+  # - すべてのチェックが完了したことを確認
+  # - 最終的なステータスをプルリクエストに表示
+  #
+  # 注意：
+  # - E2E テストはまだ無効化されているため、ここでは required: false
+  # ================================================================================
+  ci-status:
+    name: ✅ CI ステータスチェック
+    runs-on: ubuntu-latest
+    # すべてのジョブの完了後に実行
+    if: always()
+    needs: [lint, test, build]
+
+    steps:
+      - name: ✅ CI パイプライン完了
+        run: |
+          echo "🎉 CI パイプラインが完了しました"
+          echo ""
+          echo "実行されたチェック："
+          echo "  ✅ ESLint - コード品質チェック"
+          echo "  ✅ Vitest - ユニットテスト実行"
+          echo "  ✅ TypeScript - 型チェック"
+          echo "  ✅ Vite - ビルド検証"
+          echo ""
+          echo "📊 詳細は各ジョブのログを参照してください"
+
+      # いずれかのジョブが失敗した場合は、このステップで失敗を報告
+      - name: 🔍 失敗したジョブをチェック
+        if: |
+          needs.lint.result == 'failure' ||
+          needs.test.result == 'failure' ||
+          needs.build.result == 'failure'
+        run: |
+          echo "❌ 以下のチェックが失敗しています："
+          [ "${{ needs.lint.result }}" = "failure" ] && echo "  ❌ ESLint"
+          [ "${{ needs.test.result }}" = "failure" ] && echo "  ❌ ユニットテスト"
+          [ "${{ needs.build.result }}" = "failure" ] && echo "  ❌ ビルド"
+          exit 1
