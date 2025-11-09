@@ -267,8 +267,8 @@ jobs:
     name: 🌐 E2E テスト
     runs-on: ubuntu-latest
     needs: build
-    # 一時的に無効化（テストが準備できたら有効化）
-    if: false
+    # E2E テストを有効化（Phase 3 で実装完了）
+    if: true
 
     strategy:
       # 複数のブラウザで並列実行
@@ -324,14 +324,15 @@ jobs:
   # - 最終的なステータスをプルリクエストに表示
   #
   # 注意：
-  # - E2E テストはまだ無効化されているため、ここでは required: false
+  # - E2E テストは Phase 3 で実装完了し、本番運用中
+  # - 複数ブラウザでの並列実行により、包括的な動作確認が可能
   # ================================================================================
   ci-status:
     name: ✅ CI ステータスチェック
     runs-on: ubuntu-latest
     # すべてのジョブの完了後に実行
     if: always()
-    needs: [lint, test, build]
+    needs: [lint, test, build, e2e]
 
     steps:
       - name: ✅ CI パイプライン完了
@@ -343,6 +344,7 @@ jobs:
           echo "  ✅ Vitest - ユニットテスト実行"
           echo "  ✅ TypeScript - 型チェック"
           echo "  ✅ Vite - ビルド検証"
+          echo "  ✅ Playwright E2E - エンドツーエンドテスト (Chromium, Firefox, WebKit)"
           echo ""
           echo "📊 詳細は各ジョブのログを参照してください"
 
@@ -351,10 +353,12 @@ jobs:
         if: |
           needs.lint.result == 'failure' ||
           needs.test.result == 'failure' ||
-          needs.build.result == 'failure'
+          needs.build.result == 'failure' ||
+          needs.e2e.result == 'failure'
         run: |
           echo "❌ 以下のチェックが失敗しています："
           [ "${{ needs.lint.result }}" = "failure" ] && echo "  ❌ ESLint"
           [ "${{ needs.test.result }}" = "failure" ] && echo "  ❌ ユニットテスト"
           [ "${{ needs.build.result }}" = "failure" ] && echo "  ❌ ビルド"
+          [ "${{ needs.e2e.result }}" = "failure" ] && echo "  ❌ E2E テスト"
           exit 1
