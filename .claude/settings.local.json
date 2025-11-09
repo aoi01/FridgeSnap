@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dir \"c:\\Users\\aoi\\Fridge snap\\src\\components\\budget\")"
+      "Bash(npm run test:*)",
+      "Bash(cd c:UsersaoiFridge snap)"
     ],
     "deny": [],
     "ask": []
