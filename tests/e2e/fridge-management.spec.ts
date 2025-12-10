@@ -25,8 +25,8 @@ test.beforeEach(async ({ page }) => {
   // アプリケーションのホームページにアクセス
   await page.goto('/');
 
-  // ページが読み込まれるまで待機
-  await page.waitForLoadState('networkidle');
+  // 基本的なコンテンツが読み込まれるまで待機
+  await page.waitForLoadState('domcontentloaded');
 });
 
 test.describe('🧊 冷蔵庫管理機能', () => {

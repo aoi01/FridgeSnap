@@ -176,12 +176,6 @@ src/
 │   ├── Index.tsx                # メインページ（187行・38.7%削減）
 │   └── NotFound.tsx             # 404ページ
 │
-├── test/                        # テスト関連
-│   ├── mocks/
-│   │   ├── handlers.ts          # MSW ハンドラー
-│   │   └── server.ts            # MSW サーバー
-│   ├── setup.ts                 # テストセットアップ
-│   └── utils.tsx                # テストユーティリティ
 │
 ├── App.tsx                      # メインアプリケーションコンポーネント
 ├── main.tsx                     # アプリケーションエントリーポイント

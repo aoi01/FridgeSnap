@@ -3,7 +3,6 @@
  *
  * このファイルは以下の型を定義します：
  * - FoodItem: 食材アイテムの完全な情報
- * - Recipe: レシピ情報
  * - MonthlyData: 月次予算データ
  * - ExpiryStatus: 有効期限ステータス
  * - その他関連する型
@@ -51,37 +50,6 @@ export type CreateFoodItemDTO = Omit<FoodItem, 'id'>;
 export type UpdateFoodItemDTO = Partial<Omit<FoodItem, 'id'>>;
 
 /**
- * レシピ情報の型定義（楽天レシピAPI等からの取得データ）
- *
- * @property recipeId - レシピの一意識別子
- * @property recipeTitle - レシピのタイトル
- * @property recipeUrl - レシピの詳細ページURL
- * @property foodImageUrl - 料理の画像URL
- * @property recipeMaterial - 必要な材料のリスト
- * @property recipeIndication - 調理方法の説明
- * @property recipeCost - 概算コスト（文字列表現）
- * @property recipePublishday - レシピの公開日
- * @property rank - レシピのランキング
- * @property matchScore - 手持ち食材とのマッチスコア（0-100）
- * @property availableIngredients - 手持ちの材料リスト
- * @property missingIngredients - 不足している材料リスト
- */
-export interface Recipe {
-  recipeId: string;
-  recipeTitle: string;
-  recipeUrl: string;
-  foodImageUrl: string;
-  recipeMaterial: string[];
-  recipeIndication: string;
-  recipeCost: string;
-  recipePublishday: string;
-  rank: string;
-  matchScore?: number;
-  availableIngredients?: string[];
-  missingIngredients?: string[];
-}
-
-/**
  * 月次予算データの型定義
  *
  * @property month - 月の表示名（例: "2024年1月"）
@@ -98,15 +66,6 @@ export interface MonthlyData {
   foodExpense: number;
   livingExpense: number;
   engelCoefficient: number;
-}
-
-/**
- * カテゴリマッピング情報（将来の拡張用）
- */
-export interface CategoryMap {
-  categoryId: string;
-  categoryName: string;
-  parentCategoryId?: string;
 }
 
 /**

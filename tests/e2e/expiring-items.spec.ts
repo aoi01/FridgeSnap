@@ -10,8 +10,8 @@ test.describe('賞味期限切れ食材の管理', () => {
   test.beforeEach(async ({ page }) => {
     // ページを読み込み
     await page.goto('/');
-    // ネットワークが完了するまで待機
-    await page.waitForLoadState('networkidle');
+    // 基本的なコンテンツが読み込まれるまで待機
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('期限切れ食材が検出される', async ({ page }) => {

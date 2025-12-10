@@ -10,169 +10,127 @@ test.describe('今日のバスケット機能', () => {
   test.beforeEach(async ({ page }) => {
     // ページを読み込み
     await page.goto('/');
-    // ネットワークが完了するまで待機
-    await page.waitForLoadState('networkidle');
+    // 基本的なコンテンツが読み込まれるまで待機
+    await page.waitForLoadState('domcontentloaded');
   });
 
-  test('バスケットが表示される', async ({ page }) => {
-    // バスケットセクションまたはバスケットタブを検索
-    const basketSection = page.locator('text=バスケット, text=Today basket, [data-testid="basket-section"]');
-    const basketTab = page.locator('button:has-text("バスケット"), button:has-text("Basket")').first();
+  test('バスケットタブが表示されて切り替えできる', async ({ page }) => {
+    // 「今日の献立」タブをクリック
+    const basketTab = page.locator('button:has-text("今日の献立")');
 
-    if (await basketTab.count() > 0) {
-      // バスケットタブをクリック
-      await basketTab.click();
-      await page.waitForTimeout(300);
+    // タブが表示されていることを確認
+    await expect(basketTab).toBeVisible({ timeout: 5000 });
 
-      // バスケットセクションが表示されることを確認
-      const content = page.locator('[role="tabpanel"], .basket-content, .tab-content');
-      if (await content.count() > 0) {
-        await expect(content.first()).toBeVisible({ timeout: 5000 });
-      }
-    } else if (await basketSection.count() > 0) {
-      // バスケットセクションが既に表示されている場合
-      await expect(basketSection.first()).toBeVisible({ timeout: 5000 });
-    }
+    // タブをクリック
+    await basketTab.click();
+    await page.waitForTimeout(300);
+
+    // バスケットコンテンツが表示されることを確認
+    // 空状態のメッセージまたはアイテムグリッドのいずれかが表示される
+    const emptyMessage = page.locator('text=今日の献立に何も選択されていません');
+    const itemGrid = page.locator('.grid');
+
+    const hasContent = await emptyMessage.isVisible().catch(() => false) ||
+                       await itemGrid.isVisible().catch(() => false);
+
+    expect(hasContent).toBeTruthy();
   });
 
   test('食材をバスケットに追加できる', async ({ page }) => {
-    // 冷蔵庫の食材を検索
-    const foodItems = page.locator('[data-testid*="food-item"], .food-item, li');
+    // まず冷蔵庫タブに移動
+    const fridgeTab = page.locator('button:has-text("冷蔵庫")');
+    await fridgeTab.click();
+    await page.waitForTimeout(300);
 
-    if (await foodItems.count() > 0) {
-      // 最初の食材を取得
-      const firstItem = foodItems.first();
+    // 食材カードを検索（カテゴリセクション内の食材）
+    const foodCards = page.locator('.grid').first().locator('> div');
 
-      // 食材の「バスケットに追加」ボタンを検索
-      const addToBasketButton = firstItem.locator('button:has-text("追加"), button:has-text("バスケット"), button:has-text("❤️"), button[aria-label*="basket"]').first();
+    // 食材が存在することを確認
+    const foodCount = await foodCards.count();
+    if (foodCount > 0) {
+      // 最初の食材カード内の「バスケットに追加」ボタンを探す
+      const firstFoodCard = foodCards.first();
+      const addButton = firstFoodCard.locator('button').filter({ has: page.locator('svg') }).first();
 
-      if (await addToBasketButton.count() > 0) {
-        // バスケットに追加
-        await addToBasketButton.click();
-        await page.waitForTimeout(500);
+      // ボタンをクリック
+      await addButton.click();
+      await page.waitForTimeout(500);
 
-        // バスケットに追加されたことを確認
-        const basketTab = page.locator('button:has-text("バスケット"), button:has-text("Basket")').first();
-        if (await basketTab.count() > 0) {
-          await basketTab.click();
-          await page.waitForTimeout(300);
+      // 今日の献立タブをクリック
+      const basketTab = page.locator('button:has-text("今日の献立")');
+      await basketTab.click();
+      await page.waitForTimeout(300);
 
-          // バスケット内に食材が表示されることを確認
-          const basketItems = page.locator('[role="tabpanel"], .basket-content').first();
-          if (await basketItems.count() > 0) {
-            await expect(basketItems).toBeVisible({ timeout: 5000 });
-          }
-        }
-      }
+      // バスケットに食材が表示されていることを確認
+      const emptyMessage = page.locator('text=今日の献立に何も選択されていません');
+      const isEmpty = await emptyMessage.isVisible().catch(() => false);
+
+      expect(isEmpty).toBeFalsy();
     }
   });
 
   test('バスケットから食材を削除できる', async ({ page }) => {
     // バスケットタブをクリック
-    const basketTab = page.locator('button:has-text("バスケット"), button:has-text("Basket")').first();
+    const basketTab = page.locator('button:has-text("今日の献立")');
+    await basketTab.click();
+    await page.waitForTimeout(300);
 
-    if (await basketTab.count() > 0) {
-      await basketTab.click();
-      await page.waitForTimeout(300);
+    // バスケットに食材があるかチェック
+    const emptyMessage = page.locator('text=今日の献立に何も選択されていません');
+    const hasItems = !(await emptyMessage.isVisible().catch(() => false));
 
-      // バスケット内の食材を検索
-      const basketItems = page.locator('[role="tabpanel"], .basket-content').first();
-      if (await basketItems.count() > 0) {
-        // 削除ボタンを検索
-        const deleteButton = basketItems.locator('button:has-text("削除"), button:has-text("×"), button:has-text("✕"), button[aria-label*="delete"]').first();
+    if (hasItems) {
+      // グリッド内のアイテムカードを取得
+      const itemCards = page.locator('.grid').first().locator('> div');
+      const countBefore = await itemCards.count();
 
-        if (await deleteButton.count() > 0) {
-          // 削除前のアイテム数を取得
-          const itemsBefore = page.locator('[role="tabpanel"], .basket-content').locator('li, [data-testid*="item"]');
-          const countBefore = await itemsBefore.count();
+      // 最初のアイテムカード内の削除ボタンを探す
+      const firstCard = itemCards.first();
+      const deleteButton = firstCard.locator('button').filter({ hasText: /削除|×/ }).first();
 
-          // 削除ボタンをクリック
-          await deleteButton.click();
-          await page.waitForTimeout(500);
+      if (await deleteButton.count() > 0) {
+        await deleteButton.click();
+        await page.waitForTimeout(500);
 
-          // 削除されたことを確認（アイテム数が減少）
-          const itemsAfter = page.locator('[role="tabpanel"], .basket-content').locator('li, [data-testid*="item"]');
-          const countAfter = await itemsAfter.count();
+        // アイテム数が減少したことを確認
+        const itemCardsAfter = page.locator('.grid').first().locator('> div');
+        const countAfter = await itemCardsAfter.count();
 
-          if (countBefore > 0) {
-            expect(countAfter).toBeLessThanOrEqual(countBefore);
-          }
-        }
+        expect(countAfter).toBeLessThanOrEqual(countBefore);
       }
     }
   });
 
-  test('バスケットの食材から料理提案を取得できる', async ({ page }) => {
-    // バスケットタブをクリック
-    const basketTab = page.locator('button:has-text("バスケット"), button:has-text("Basket")').first();
+  test('レシピ検索タブに移動できる', async ({ page }) => {
+    // レシピ検索タブをクリック
+    const recipesTab = page.locator('button:has-text("レシピ検索")');
 
-    if (await basketTab.count() > 0) {
-      await basketTab.click();
-      await page.waitForTimeout(300);
+    // タブが表示されていることを確認
+    await expect(recipesTab).toBeVisible({ timeout: 5000 });
 
-      // 複数の食材をバスケットに追加（複数の食材が必要な場合）
-      // または既存の食材を使用
+    // タブをクリック
+    await recipesTab.click();
+    await page.waitForTimeout(300);
 
-      // 料理提案ボタンを検索
-      const suggestButton = page.locator('button:has-text("提案"), button:has-text("レシピ"), button:has-text("料理"), button:has-text("検索")').first();
-
-      if (await suggestButton.count() > 0) {
-        // 料理提案ボタンをクリック
-        await suggestButton.click();
-        await page.waitForTimeout(2000);
-
-        // AI が料理提案を返すことを確認
-        const suggestions = page.locator('[data-testid*="recipe"], [data-testid*="suggestion"], .recipe-card, .suggestion-card');
-        if (await suggestions.count() > 0) {
-          await expect(suggestions.first()).toBeVisible({ timeout: 10000 });
-        }
-
-        // または提案が表示されるセクションを確認
-        const suggestionSection = page.locator('text=提案, text=レシピ, text=料理').first();
-        if (await suggestionSection.count() > 0) {
-          await expect(suggestionSection).toBeVisible({ timeout: 10000 });
-        }
-      }
-    }
+    // タブが選択状態になっていることを確認（簡易的な確認）
+    const tabContent = page.locator('main, [role="main"]').first();
+    await expect(tabContent).toBeVisible({ timeout: 5000 });
   });
 
-  test('提案された料理をお気に入りに追加できる', async ({ page }) => {
-    // バスケットタブをクリック
-    const basketTab = page.locator('button:has-text("バスケット"), button:has-text("Basket")').first();
+  test('家計簿タブに移動できる', async ({ page }) => {
+    // 家計簿タブをクリック
+    const budgetTab = page.locator('button:has-text("家計簿")');
 
-    if (await basketTab.count() > 0) {
-      await basketTab.click();
-      await page.waitForTimeout(300);
+    // タブが表示されていることを確認
+    await expect(budgetTab).toBeVisible({ timeout: 5000 });
 
-      // 料理提案ボタンをクリック
-      const suggestButton = page.locator('button:has-text("提案"), button:has-text("レシピ"), button:has-text("料理")').first();
+    // タブをクリック
+    await budgetTab.click();
+    await page.waitForTimeout(300);
 
-      if (await suggestButton.count() > 0) {
-        await suggestButton.click();
-        await page.waitForTimeout(2000);
-
-        // 提案された料理を検索
-        const recipes = page.locator('[data-testid*="recipe"], .recipe-card, .suggestion-card');
-
-        if (await recipes.count() > 0) {
-          // 最初の料理のお気に入りボタンを検索
-          const firstRecipe = recipes.first();
-          const favoriteButton = firstRecipe.locator('button:has-text("❤"), button:has-text("☆"), button[aria-label*="favorite"]').first();
-
-          if (await favoriteButton.count() > 0) {
-            // お気に入りボタンをクリック
-            await favoriteButton.click();
-            await page.waitForTimeout(500);
-
-            // お気に入りに追加されたことを確認（ボタンの色が変わる、または確認メッセージが表示される）
-            const confirmMessage = page.locator('text=お気に入り, text=追加されました, text=保存されました').first();
-            if (await confirmMessage.count() > 0) {
-              await expect(confirmMessage).toBeVisible({ timeout: 5000 });
-            }
-          }
-        }
-      }
-    }
+    // タブが選択状態になっていることを確認（簡易的な確認）
+    const tabContent = page.locator('main, [role="main"]').first();
+    await expect(tabContent).toBeVisible({ timeout: 5000 });
   });
 
   test.describe('レスポンシブテスト', () => {
@@ -181,18 +139,18 @@ test.describe('今日のバスケット機能', () => {
       await page.setViewportSize({ width: 375, height: 667 });
 
       // バスケットタブをクリック
-      const basketTab = page.locator('button:has-text("バスケット"), button:has-text("Basket")').first();
+      const basketTab = page.locator('button:has-text("今日の献立")');
+      await basketTab.click();
+      await page.waitForTimeout(300);
 
-      if (await basketTab.count() > 0) {
-        await basketTab.click();
-        await page.waitForTimeout(300);
+      // バスケットコンテンツが表示されることを確認
+      const emptyMessage = page.locator('text=今日の献立に何も選択されていません');
+      const gridContent = page.locator('.grid').first();
 
-        // バスケットコンテンツが表示されることを確認
-        const basketContent = page.locator('[role="tabpanel"], .basket-content').first();
-        if (await basketContent.count() > 0) {
-          await expect(basketContent).toBeVisible({ timeout: 5000 });
-        }
-      }
+      const hasContent = await emptyMessage.isVisible().catch(() => false) ||
+                         await gridContent.isVisible().catch(() => false);
+
+      expect(hasContent).toBeTruthy();
     });
 
     test('タブレット画面でバスケット機能が動作する', async ({ page }) => {
@@ -200,18 +158,18 @@ test.describe('今日のバスケット機能', () => {
       await page.setViewportSize({ width: 768, height: 1024 });
 
       // バスケットタブをクリック
-      const basketTab = page.locator('button:has-text("バスケット"), button:has-text("Basket")').first();
+      const basketTab = page.locator('button:has-text("今日の献立")');
+      await basketTab.click();
+      await page.waitForTimeout(300);
 
-      if (await basketTab.count() > 0) {
-        await basketTab.click();
-        await page.waitForTimeout(300);
+      // バスケットコンテンツが表示されることを確認
+      const emptyMessage = page.locator('text=今日の献立に何も選択されていません');
+      const gridContent = page.locator('.grid').first();
 
-        // バスケットコンテンツが表示されることを確認
-        const basketContent = page.locator('[role="tabpanel"], .basket-content').first();
-        if (await basketContent.count() > 0) {
-          await expect(basketContent).toBeVisible({ timeout: 5000 });
-        }
-      }
+      const hasContent = await emptyMessage.isVisible().catch(() => false) ||
+                         await gridContent.isVisible().catch(() => false);
+
+      expect(hasContent).toBeTruthy();
     });
   });
 });
