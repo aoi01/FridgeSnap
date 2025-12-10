@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npm run test:*)",
-      "Bash(cd c:UsersaoiFridge snap)"
+      "Bash(cd c:UsersaoiFridge snap)",
+      "Bash(git revert:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []
