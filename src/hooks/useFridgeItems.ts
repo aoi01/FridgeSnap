@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 export const useFridgeItems = () => {
   const [foodItems, setFoodItems] = useState<FoodItem[]>([]);
 
-  // Load data from localStorage on mount
+  //初期読み込み処理
   useEffect(() => {
     const savedItems = localStorage.getItem(STORAGE_KEYS.FRIDGE_ITEMS);
     if (savedItems) {
@@ -25,12 +25,12 @@ export const useFridgeItems = () => {
     }
   }, []);
 
-  // Sync food items to localStorage
+  // foodItemsの変更をlocalStorageに反映
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.FRIDGE_ITEMS, JSON.stringify(foodItems));
   }, [foodItems]);
 
-  // Check for expiring items
+  // 期限切れ食材をチェック
   useEffect(() => {
     const checkExpiringItems = () => {
       const today = new Date();
